@@ -408,8 +408,11 @@ export default function Dashboard() {
                   </div>
                 ))}
               </CardContent>
-              <CardFooter className="justify-end text-sm text-muted-foreground">
-                Updated 8 minutes ago
+              <CardFooter className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between text-sm text-muted-foreground">
+                <span>Updated 8 minutes ago</span>
+                <Button variant="ghost" size="sm" asChild>
+                  <Link href={dashboardRoutes.activities()}>Show all</Link>
+                </Button>
               </CardFooter>
             </Card>
           </div>
