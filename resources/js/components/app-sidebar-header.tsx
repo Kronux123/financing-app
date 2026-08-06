@@ -1,6 +1,6 @@
+import AppearanceToggleTab from '@/components/appearance-tabs';
 import { Breadcrumbs } from '@/components/breadcrumbs';
 import { SidebarTrigger } from '@/components/ui/sidebar';
-import AppearanceToggleTab from '@/components/appearance-tabs';
 import type { BreadcrumbItem as BreadcrumbItemType } from '@/types';
 
 export function AppSidebarHeader({

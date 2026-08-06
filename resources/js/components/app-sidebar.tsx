@@ -1,5 +1,11 @@
 import { Link } from '@inertiajs/react';
-import { Activity, BookOpen, DollarSign, FolderGit2, LayoutGrid } from 'lucide-react';
+import {
+    Activity,
+    BookOpen,
+    DollarSign,
+    FolderGit2,
+    LayoutGrid,
+} from 'lucide-react';
 import AppLogo from '@/components/app-logo';
 import { NavFooter } from '@/components/nav-footer';
 import { NavMain } from '@/components/nav-main';
