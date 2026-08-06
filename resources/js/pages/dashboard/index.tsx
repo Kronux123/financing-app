@@ -1,36 +1,27 @@
 import { Head, Link } from '@inertiajs/react';
-import type { FormEvent } from 'react';
-import { useState } from 'react';
 import { SavingsChart } from '@/components/dashboard/savings-chart';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-    Sheet,
-    SheetContent,
-    SheetDescription,
-    SheetFooter,
-    SheetHeader,
-    SheetTitle,
-    SheetTrigger,
-} from '@/components/ui/sheet';
+import { useStoredBudgetPlan } from '@/hooks/use-budget-plan';
+import type { BudgetPlan } from '@/lib/budget';
+import { groupTotal, isPlanPopulated, planTotals } from '@/lib/budget';
+import { formatPeso, formatSigned } from '@/lib/currency';
 import { dashboard } from '@/routes';
 import dashboardRoutes from '@/routes/dashboard';
+import { edit as financeRoute } from '@/routes/finance';
 
+/**
+ * Figures the budget plan cannot supply yet — they need balances and history
+ * rather than a forward-looking plan. These stay sample data until the backend
+ * release gives them somewhere real to come from.
+ */
 const savingsGoal = 108_000;
 const totalSaved = 82_400;
-const monthlyGoal = 7_200;
+const sampleMonthlyGoal = 7_200;
 
 const supportingStats = [
     { label: 'Average monthly save', value: 6_880 },
     { label: 'Emergency buffer', value: 18_200 },
-];
-
-const metrics = [
-    { label: 'Monthly expenses', value: -4_125, note: 'Outgoing this month' },
-    { label: 'Outstanding debt', value: -16_780, note: 'Remaining balance' },
-    { label: 'Projected cashflow', value: 1_320, note: 'Next 30 days' },
 ];
 
 const monthlySavings = [
@@ -41,11 +32,20 @@ const monthlySavings = [
     { month: 'Mar', amount: 6_120 },
 ];
 
-const spendingCategories = [
-    { name: 'Housing', amount: 1_450, color: 'bg-cyan-500' },
-    { name: 'Utilities', amount: 630, color: 'bg-violet-500' },
-    { name: 'Groceries', amount: 540, color: 'bg-amber-500' },
-    { name: 'Transport', amount: 305, color: 'bg-sky-500' },
+const outstandingDebt = -16_780;
+
+const recentActivity = [
+    { title: 'Mortgage payment', amount: -1_250, when: 'Today' },
+    { title: 'Spotify subscription', amount: -15, when: 'Yesterday' },
+    { title: 'Salary deposit', amount: 5_800, when: '2 days ago' },
+    { title: 'Credit card payment', amount: -420, when: '4 days ago' },
+];
+
+const sampleCategories = [
+    { name: 'Housing', amount: 1_450 },
+    { name: 'Utilities', amount: 630 },
+    { name: 'Groceries', amount: 540 },
+    { name: 'Transport', amount: 305 },
 ];
 
 const categoryColors = [
@@ -57,66 +57,88 @@ const categoryColors = [
     'bg-teal-500',
 ];
 
-const recentActivity = [
-    { title: 'Mortgage payment', amount: -1_250, when: 'Today' },
-    { title: 'Spotify subscription', amount: -15, when: 'Yesterday' },
-    { title: 'Salary deposit', amount: 5_800, when: '2 days ago' },
-    { title: 'Credit card payment', amount: -420, when: '4 days ago' },
-];
+const savingsGroupId = 'savings';
 
-const formatPeso = (value: number) => {
-    return `₱${Math.abs(value).toLocaleString('en-US')}`;
+type DerivedFigures = {
+    monthlyGoal: number;
+    monthlyExpenses: number;
+    projectedCashflow: number;
+    categories: { name: string; amount: number; color: string }[];
 };
 
-const formatSigned = (value: number) => {
-    return `${value < 0 ? '-' : '+'}${formatPeso(value)}`;
+const withColors = (
+    categories: { name: string; amount: number }[],
+): DerivedFigures['categories'] => {
+    return categories.map((category, index) => ({
+        ...category,
+        color: categoryColors[index % categoryColors.length],
+    }));
+};
+
+/**
+ * Reads the saved budget plan where it can, and falls back to the sample
+ * figures so a first visit never renders an empty dashboard.
+ */
+const deriveFigures = (plan: BudgetPlan | null): DerivedFigures => {
+    if (!plan || !isPlanPopulated(plan)) {
+        return {
+            monthlyGoal: sampleMonthlyGoal,
+            monthlyExpenses: -4_125,
+            projectedCashflow: 1_320,
+            categories: withColors(sampleCategories),
+        };
+    }
+
+    const { allocated, unallocated } = planTotals(plan);
+    const savingsGroup = plan.groups.find(
+        (group) => group.id === savingsGroupId,
+    );
+    const plannedSavings = savingsGroup ? groupTotal(savingsGroup) : 0;
+
+    return {
+        monthlyGoal: plannedSavings > 0 ? plannedSavings : sampleMonthlyGoal,
+        monthlyExpenses: -(allocated - plannedSavings),
+        projectedCashflow: unallocated,
+        categories: withColors(
+            plan.groups
+                .map((group) => ({
+                    name: group.name,
+                    amount: groupTotal(group),
+                }))
+                .filter((group) => group.amount > 0),
+        ),
+    };
 };
 
 export default function Dashboard() {
-    const [categoryList, setCategoryList] = useState(spendingCategories);
-    const [drawerOpen, setDrawerOpen] = useState(false);
-    const [showCreateCategory, setShowCreateCategory] = useState(false);
-    const [newCategoryName, setNewCategoryName] = useState('');
-    const [newCategoryAmount, setNewCategoryAmount] = useState('');
+    const plan = useStoredBudgetPlan();
+    const hasPlan = plan !== null && isPlanPopulated(plan);
+    const { monthlyGoal, monthlyExpenses, projectedCashflow, categories } =
+        deriveFigures(plan);
 
     const fundedRatio = totalSaved / savingsGoal;
-    const categoryTotal = categoryList.reduce(
+    const categoryTotal = categories.reduce(
         (sum, item) => sum + item.amount,
         0,
     );
 
-    const handleDrawerOpenChange = (open: boolean) => {
-        setDrawerOpen(open);
-
-        if (!open) {
-            setShowCreateCategory(false);
-            setNewCategoryName('');
-            setNewCategoryAmount('');
-        }
-    };
-
-    const handleAddCategory = (event: FormEvent<HTMLFormElement>) => {
-        event.preventDefault();
-
-        if (!newCategoryName.trim()) {
-            return;
-        }
-
-        setCategoryList([
-            ...categoryList,
-            {
-                name: newCategoryName.trim(),
-                amount: Number(newCategoryAmount.replace(/[^0-9.]/g, '')) || 0,
-                color: categoryColors[
-                    categoryList.length % categoryColors.length
-                ],
-            },
-        ]);
-
-        setShowCreateCategory(false);
-        setNewCategoryName('');
-        setNewCategoryAmount('');
-    };
+    const metrics = [
+        {
+            label: 'Monthly expenses',
+            value: monthlyExpenses,
+            note: hasPlan ? 'Planned outgoing' : 'Outgoing this month',
+        },
+        {
+            label: 'Outstanding debt',
+            value: outstandingDebt,
+            note: 'Remaining balance',
+        },
+        {
+            label: 'Projected cashflow',
+            value: projectedCashflow,
+            note: hasPlan ? 'Unallocated this month' : 'Next 30 days',
+        },
+    ];
 
     return (
         <>
@@ -129,6 +151,22 @@ export default function Dashboard() {
                     </h1>
                     <p className="text-sm text-muted-foreground">March 2026</p>
                 </header>
+
+                {!hasPlan && (
+                    <Card>
+                        <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4">
+                            <p className="text-sm text-muted-foreground">
+                                These are sample figures. Set up your budget
+                                plan to see your own numbers here.
+                            </p>
+                            <Button variant="secondary" size="sm" asChild>
+                                <Link href={financeRoute()}>
+                                    Build your plan
+                                </Link>
+                            </Button>
+                        </CardContent>
+                    </Card>
+                )}
 
                 <Card>
                     <CardContent className="flex flex-col gap-6 p-6 lg:flex-row lg:items-end lg:justify-between">
@@ -224,123 +262,21 @@ export default function Dashboard() {
                     <Card>
                         <CardHeader className="flex flex-row items-center justify-between gap-4">
                             <CardTitle className="text-base">
-                                Spending categories
+                                {hasPlan
+                                    ? 'Planned by group'
+                                    : 'Spending categories'}
                             </CardTitle>
-                            <Sheet
-                                open={drawerOpen}
-                                onOpenChange={handleDrawerOpenChange}
-                            >
-                                <SheetTrigger asChild>
-                                    <Button variant="ghost" size="sm">
-                                        Manage
-                                    </Button>
-                                </SheetTrigger>
-                                <SheetContent className="flex flex-col gap-0">
-                                    <SheetHeader>
-                                        <SheetTitle>
-                                            Spending categories
-                                        </SheetTitle>
-                                        <SheetDescription>
-                                            Add a category or review what you
-                                            already track.
-                                        </SheetDescription>
-                                    </SheetHeader>
-
-                                    <div className="flex-1 divide-y divide-border overflow-y-auto px-4">
-                                        {categoryList.map((item) => (
-                                            <div
-                                                key={item.name}
-                                                className="flex items-center justify-between gap-4 py-3"
-                                            >
-                                                <div className="flex min-w-0 items-center gap-3">
-                                                    <span
-                                                        className={`size-2.5 shrink-0 rounded-full ${item.color}`}
-                                                    />
-                                                    <span className="truncate text-sm">
-                                                        {item.name}
-                                                    </span>
-                                                </div>
-                                                <span className="text-sm font-medium tabular-nums">
-                                                    {formatPeso(item.amount)}
-                                                </span>
-                                            </div>
-                                        ))}
-                                    </div>
-
-                                    <SheetFooter>
-                                        {showCreateCategory ? (
-                                            <form
-                                                onSubmit={handleAddCategory}
-                                                className="space-y-3"
-                                            >
-                                                <div className="space-y-1.5">
-                                                    <Label htmlFor="category-name">
-                                                        Name
-                                                    </Label>
-                                                    <Input
-                                                        id="category-name"
-                                                        value={newCategoryName}
-                                                        onChange={(event) =>
-                                                            setNewCategoryName(
-                                                                event.target
-                                                                    .value,
-                                                            )
-                                                        }
-                                                        placeholder="Dining out"
-                                                    />
-                                                </div>
-                                                <div className="space-y-1.5">
-                                                    <Label htmlFor="category-amount">
-                                                        Monthly amount
-                                                    </Label>
-                                                    <Input
-                                                        id="category-amount"
-                                                        value={
-                                                            newCategoryAmount
-                                                        }
-                                                        onChange={(event) =>
-                                                            setNewCategoryAmount(
-                                                                event.target
-                                                                    .value,
-                                                            )
-                                                        }
-                                                        placeholder="450"
-                                                        inputMode="decimal"
-                                                    />
-                                                </div>
-                                                <div className="flex gap-2">
-                                                    <Button type="submit">
-                                                        Add category
-                                                    </Button>
-                                                    <Button
-                                                        type="button"
-                                                        variant="ghost"
-                                                        onClick={() =>
-                                                            setShowCreateCategory(
-                                                                false,
-                                                            )
-                                                        }
-                                                    >
-                                                        Cancel
-                                                    </Button>
-                                                </div>
-                                            </form>
-                                        ) : (
-                                            <Button
-                                                variant="outline"
-                                                onClick={() =>
-                                                    setShowCreateCategory(true)
-                                                }
-                                            >
-                                                Add category
-                                            </Button>
-                                        )}
-                                    </SheetFooter>
-                                </SheetContent>
-                            </Sheet>
+                            <Button variant="ghost" size="sm" asChild>
+                                <Link
+                                    href={financeRoute()}
+                                    data-test="manage-categories"
+                                >
+                                    Manage
+                                </Link>
+                            </Button>
                         </CardHeader>
                         <CardContent className="divide-y divide-border pt-0">
-                            {categoryList.slice(0, 4).map((item) => {
+                            {categories.slice(0, 6).map((item) => {
                                 const share =
                                     categoryTotal > 0
                                         ? Math.round(

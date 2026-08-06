@@ -1,347 +1,226 @@
 import { Head, Link } from '@inertiajs/react';
 import { useState } from 'react';
-import { Badge } from '@/components/ui/badge';
+import { toast } from 'sonner';
+import { PaycheckCard } from '@/components/finance/paycheck-card';
+import { PlanSummary } from '@/components/finance/plan-summary';
 import { Button } from '@/components/ui/button';
-import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-} from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { saveBudgetPlan, useStoredBudgetPlan } from '@/hooks/use-budget-plan';
+import type { BudgetPlan, ExpenseItem, PayCadence } from '@/lib/budget';
+import { cadenceOptions, createId, createPlan, reassignTo } from '@/lib/budget';
 import { dashboard } from '@/routes';
-import { edit as financeSettings } from '@/routes/finance';
+import { edit as financeRoute } from '@/routes/finance';
 
-const frequencies = [
-    { value: 'monthly', label: 'Monthly' },
-    { value: 'biweekly', label: 'Biweekly' },
-    { value: 'weekly', label: 'Weekly' },
-];
-
-const storageKey = 'financeSettings';
-
-type FinanceSettings = {
-    monthlySalary: string;
-    payFrequency: string;
-    nextPayday: string;
-    monthlyBudget: string;
-    savingsGoal: string;
-    emergencyBuffer: string;
+/**
+ * The plan being edited alongside the one last written to storage. Holding both
+ * in a single state value keeps them in step, so an untouched page can never
+ * report itself as dirty.
+ */
+type Draft = {
+    plan: BudgetPlan;
+    saved: BudgetPlan;
+    /** The stored plan this draft was seeded from, to detect late hydration. */
+    source: BudgetPlan | null;
 };
 
-const defaultSettings: FinanceSettings = {
-    monthlySalary: '',
-    payFrequency: 'monthly',
-    nextPayday: '',
-    monthlyBudget: '',
-    savingsGoal: '',
-    emergencyBuffer: '',
-};
+export default function Finance() {
+    const storedPlan = useStoredBudgetPlan();
+    const [draft, setDraft] = useState<Draft>(() => {
+        const initial = storedPlan ?? createPlan();
 
-const parseNumber = (value: string) => {
-    return Number(value.replace(/[^0-9.-]/g, '')) || 0;
-};
-
-const formatCurrency = (value: number) => {
-    return `₱${value.toLocaleString('en-US', {
-        maximumFractionDigits: 0,
-    })}`;
-};
-
-export default function FinanceSettings() {
-    const [settings, setSettings] = useState<FinanceSettings>(() => {
-        if (typeof window === 'undefined') {
-            return defaultSettings;
-        }
-
-        const stored = window.localStorage.getItem(storageKey);
-
-        if (!stored) {
-            return defaultSettings;
-        }
-
-        try {
-            const parsed = JSON.parse(stored) as FinanceSettings;
-
-            return { ...defaultSettings, ...parsed };
-        } catch {
-            window.localStorage.removeItem(storageKey);
-
-            return defaultSettings;
-        }
+        return { plan: initial, saved: initial, source: storedPlan };
     });
-    const [saved, setSaved] = useState(false);
 
-    const handleSave = () => {
-        window.localStorage.setItem(storageKey, JSON.stringify(settings));
-        setSaved(true);
-        window.setTimeout(() => setSaved(false), 2000);
+    // Adopt a plan that arrives after the first render, but never over edits.
+    if (draft.source !== storedPlan && draft.plan === draft.saved) {
+        const next = storedPlan ?? createPlan();
+
+        setDraft({ plan: next, saved: next, source: storedPlan });
+    }
+
+    const plan = draft.plan;
+    const isDirty = draft.plan !== draft.saved;
+
+    const updatePlan = (next: BudgetPlan) => {
+        setDraft({ ...draft, plan: next });
     };
 
-    const monthlySalary = parseNumber(settings.monthlySalary);
-    const monthlyBudget = parseNumber(settings.monthlyBudget);
-    const savingsGoal = parseNumber(settings.savingsGoal);
-    const emergencyBuffer = parseNumber(settings.emergencyBuffer);
-    const available = monthlySalary - monthlyBudget;
+    const handleCadenceChange = (value: string) => {
+        if (value !== 'monthly' && value !== 'semi-monthly') {
+            return;
+        }
+
+        updatePlan(reassignTo(plan, value as PayCadence));
+    };
+
+    const handleIncomeChange = (paycheckId: string, amount: number) => {
+        updatePlan({
+            ...plan,
+            paychecks: plan.paychecks.map((paycheck) =>
+                paycheck.id === paycheckId ? { ...paycheck, amount } : paycheck,
+            ),
+        });
+    };
+
+    const handleItemAdd = (groupId: string, paycheckId: string) => {
+        updatePlan({
+            ...plan,
+            groups: plan.groups.map((group) =>
+                group.id === groupId
+                    ? {
+                          ...group,
+                          items: [
+                              ...group.items,
+                              {
+                                  id: createId('item'),
+                                  name: '',
+                                  amount: 0,
+                                  paycheckId,
+                              },
+                          ],
+                      }
+                    : group,
+            ),
+        });
+    };
+
+    const handleItemChange = (
+        groupId: string,
+        itemId: string,
+        patch: Partial<ExpenseItem>,
+    ) => {
+        updatePlan({
+            ...plan,
+            groups: plan.groups.map((group) =>
+                group.id === groupId
+                    ? {
+                          ...group,
+                          items: group.items.map((item) =>
+                              item.id === itemId ? { ...item, ...patch } : item,
+                          ),
+                      }
+                    : group,
+            ),
+        });
+    };
+
+    const handleItemRemove = (groupId: string, itemId: string) => {
+        updatePlan({
+            ...plan,
+            groups: plan.groups.map((group) =>
+                group.id === groupId
+                    ? {
+                          ...group,
+                          items: group.items.filter(
+                              (item) => item.id !== itemId,
+                          ),
+                      }
+                    : group,
+            ),
+        });
+    };
+
+    const handleSave = () => {
+        saveBudgetPlan(plan);
+        setDraft({ plan, saved: plan, source: plan });
+        toast.success('Budget plan saved.');
+    };
 
     return (
         <>
-            <Head title="Finance settings" />
+            <Head title="Budget plan" />
 
-            <div className="w-full max-w-full space-y-6 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
-                <div className="space-y-3">
-                    <p className="text-sm font-medium tracking-[0.2em] text-muted-foreground uppercase">
-                        Finance
-                    </p>
-                    <h1 className="text-3xl font-semibold text-foreground">
-                        Finance settings
-                    </h1>
-                    <p className="max-w-none text-sm text-muted-foreground">
-                        Set your monthly salary, budget goals, and savings
-                        targets to drive your dashboard metrics.
-                    </p>
-                </div>
+            <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 p-4 md:p-6">
+                <header className="flex flex-wrap items-end justify-between gap-4">
+                    <div>
+                        <h1 className="text-2xl font-semibold tracking-tight">
+                            Budget plan
+                        </h1>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                            Set how you get paid, then give every peso a job
+                            before it arrives.
+                        </p>
+                    </div>
 
-                <div className="grid w-full gap-6 xl:grid-cols-[1.65fr_0.95fr]">
-                    <Card className="w-full overflow-hidden">
-                        <CardHeader>
-                            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                                <div>
-                                    <CardTitle>Income & goals</CardTitle>
-                                    <CardDescription>
-                                        Update the values you want to use in
-                                        your monthly finance model.
-                                    </CardDescription>
-                                </div>
-                                <Badge variant="secondary">Frontend only</Badge>
-                            </div>
-                        </CardHeader>
-                        <CardContent className="space-y-6">
-                            <div className="grid w-full gap-4 md:grid-cols-2">
-                                <div className="grid w-full gap-2">
-                                    <Label htmlFor="monthlySalary">
-                                        Monthly salary
-                                    </Label>
-                                    <Input
-                                        id="monthlySalary"
-                                        placeholder="₱0"
-                                        value={settings.monthlySalary}
-                                        onChange={(event) =>
-                                            setSettings({
-                                                ...settings,
-                                                monthlySalary:
-                                                    event.target.value,
-                                            })
-                                        }
-                                    />
-                                </div>
-                                <div className="grid w-full gap-2">
-                                    <Label htmlFor="payFrequency">
-                                        Pay frequency
-                                    </Label>
-                                    <Select
-                                        value={settings.payFrequency}
-                                        onValueChange={(value) =>
-                                            setSettings({
-                                                ...settings,
-                                                payFrequency: value,
-                                            })
-                                        }
+                    <div className="flex items-center gap-3">
+                        {isDirty && (
+                            <span className="text-sm text-muted-foreground">
+                                Unsaved changes
+                            </span>
+                        )}
+                        <Button
+                            data-test="save-plan"
+                            disabled={!isDirty}
+                            onClick={handleSave}
+                        >
+                            Save plan
+                        </Button>
+                    </div>
+                </header>
+
+                <div className="grid items-start gap-6 xl:grid-cols-[1.7fr_1fr]">
+                    <div className="space-y-4">
+                        <div className="grid gap-2">
+                            <Label htmlFor="cadence">How you get paid</Label>
+                            <ToggleGroup
+                                id="cadence"
+                                type="single"
+                                variant="outline"
+                                value={plan.cadence}
+                                onValueChange={handleCadenceChange}
+                                className="w-full sm:w-auto"
+                            >
+                                {cadenceOptions.map((option) => (
+                                    <ToggleGroupItem
+                                        key={option.value}
+                                        value={option.value}
+                                        data-test={`cadence-${option.value}`}
+                                        className="px-4"
                                     >
-                                        <SelectTrigger
-                                            id="payFrequency"
-                                            className="w-full"
-                                        >
-                                            <SelectValue placeholder="Frequency" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {frequencies.map((item) => (
-                                                <SelectItem
-                                                    key={item.value}
-                                                    value={item.value}
-                                                >
-                                                    {item.label}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                            </div>
+                                        {option.label}
+                                    </ToggleGroupItem>
+                                ))}
+                            </ToggleGroup>
+                            <p className="text-xs text-muted-foreground">
+                                {plan.cadence === 'semi-monthly'
+                                    ? 'Twice a month — the 15th and the last day.'
+                                    : 'Once a month, on the last day.'}
+                            </p>
+                        </div>
 
-                            <div className="grid gap-4 md:grid-cols-2">
-                                <div className="grid gap-2">
-                                    <Label htmlFor="nextPayday">
-                                        Next payday
-                                    </Label>
-                                    <Input
-                                        id="nextPayday"
-                                        type="date"
-                                        value={settings.nextPayday}
-                                        onChange={(event) =>
-                                            setSettings({
-                                                ...settings,
-                                                nextPayday: event.target.value,
-                                            })
-                                        }
-                                    />
-                                </div>
-                                <div className="grid gap-2">
-                                    <Label htmlFor="monthlyBudget">
-                                        Monthly budget
-                                    </Label>
-                                    <Input
-                                        id="monthlyBudget"
-                                        placeholder="₱0"
-                                        value={settings.monthlyBudget}
-                                        onChange={(event) =>
-                                            setSettings({
-                                                ...settings,
-                                                monthlyBudget:
-                                                    event.target.value,
-                                            })
-                                        }
-                                    />
-                                </div>
-                            </div>
+                        <div
+                            className={
+                                plan.cadence === 'semi-monthly'
+                                    ? 'grid gap-4 md:grid-cols-2'
+                                    : 'grid gap-4'
+                            }
+                        >
+                            {plan.paychecks.map((paycheck) => (
+                                <PaycheckCard
+                                    key={paycheck.id}
+                                    plan={plan}
+                                    paycheck={paycheck}
+                                    otherPaycheck={plan.paychecks.find(
+                                        (item) => item.id !== paycheck.id,
+                                    )}
+                                    onIncomeChange={(amount) =>
+                                        handleIncomeChange(paycheck.id, amount)
+                                    }
+                                    onItemAdd={handleItemAdd}
+                                    onItemChange={handleItemChange}
+                                    onItemRemove={handleItemRemove}
+                                />
+                            ))}
+                        </div>
+                    </div>
 
-                            <div className="grid gap-4 md:grid-cols-2">
-                                <div className="grid gap-2">
-                                    <Label htmlFor="savingsGoal">
-                                        Savings goal
-                                    </Label>
-                                    <Input
-                                        id="savingsGoal"
-                                        placeholder="₱0"
-                                        value={settings.savingsGoal}
-                                        onChange={(event) =>
-                                            setSettings({
-                                                ...settings,
-                                                savingsGoal: event.target.value,
-                                            })
-                                        }
-                                    />
-                                </div>
-                                <div className="grid gap-2">
-                                    <Label htmlFor="emergencyBuffer">
-                                        Emergency buffer
-                                    </Label>
-                                    <Input
-                                        id="emergencyBuffer"
-                                        placeholder="₱0"
-                                        value={settings.emergencyBuffer}
-                                        onChange={(event) =>
-                                            setSettings({
-                                                ...settings,
-                                                emergencyBuffer:
-                                                    event.target.value,
-                                            })
-                                        }
-                                    />
-                                </div>
-                            </div>
+                    <div className="space-y-4">
+                        <PlanSummary plan={plan} />
 
-                            <div className="flex flex-col gap-3 rounded-3xl border border-border bg-muted p-4 text-sm text-muted-foreground">
-                                <p className="font-medium text-foreground">
-                                    Tips
-                                </p>
-                                <ul className="list-disc space-y-2 pl-5">
-                                    <li>
-                                        Use this page to define your income and
-                                        budget assumptions.
-                                    </li>
-                                    <li>
-                                        Later, backend automation can use these
-                                        values to seed monthly updates.
-                                    </li>
-                                    <li>
-                                        Keep the annual and monthly values
-                                        aligned for more accurate forecasts.
-                                    </li>
-                                </ul>
-                            </div>
-
-                            <div className="flex flex-wrap items-center gap-3">
-                                <Button onClick={handleSave}>
-                                    Save settings
-                                </Button>
-                                {saved && (
-                                    <span className="text-sm text-emerald-400">
-                                        Saved locally.
-                                    </span>
-                                )}
-                                <Button variant="secondary" asChild size="sm">
-                                    <Link href={dashboard()}>
-                                        Back to dashboard
-                                    </Link>
-                                </Button>
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    <div className="w-full space-y-4">
-                        <Card className="w-full overflow-hidden">
-                            <CardHeader>
-                                <CardTitle>Summary</CardTitle>
-                                <CardDescription>
-                                    Quick snapshot of your current values.
-                                </CardDescription>
-                            </CardHeader>
-                            <CardContent className="space-y-4">
-                                <div className="grid gap-4">
-                                    <div className="rounded-3xl border border-border bg-background p-4">
-                                        <p className="text-sm text-muted-foreground">
-                                            Monthly salary
-                                        </p>
-                                        <p className="mt-2 text-2xl font-semibold text-foreground">
-                                            {monthlySalary
-                                                ? formatCurrency(monthlySalary)
-                                                : '–'}
-                                        </p>
-                                    </div>
-                                    <div className="rounded-3xl border border-border bg-background p-4">
-                                        <p className="text-sm text-muted-foreground">
-                                            Remaining budget
-                                        </p>
-                                        <p className="mt-2 text-2xl font-semibold text-foreground">
-                                            {monthlySalary
-                                                ? formatCurrency(available)
-                                                : '–'}
-                                        </p>
-                                    </div>
-                                    <div className="rounded-3xl border border-border bg-background p-4">
-                                        <p className="text-sm text-muted-foreground">
-                                            Savings goal
-                                        </p>
-                                        <p className="mt-2 text-2xl font-semibold text-foreground">
-                                            {savingsGoal
-                                                ? formatCurrency(savingsGoal)
-                                                : '–'}
-                                        </p>
-                                    </div>
-                                    <div className="rounded-3xl border border-border bg-background p-4">
-                                        <p className="text-sm text-muted-foreground">
-                                            Emergency buffer
-                                        </p>
-                                        <p className="mt-2 text-2xl font-semibold text-foreground">
-                                            {emergencyBuffer
-                                                ? formatCurrency(
-                                                      emergencyBuffer,
-                                                  )
-                                                : '–'}
-                                        </p>
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </Card>
+                        <Button variant="secondary" asChild size="sm">
+                            <Link href={dashboard()}>Back to dashboard</Link>
+                        </Button>
                     </div>
                 </div>
             </div>
@@ -349,11 +228,11 @@ export default function FinanceSettings() {
     );
 }
 
-FinanceSettings.layout = {
+Finance.layout = {
     breadcrumbs: [
         {
             title: 'Finance',
-            href: financeSettings(),
+            href: financeRoute(),
         },
     ],
 };

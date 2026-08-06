@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { SavingsCalendar } from '@/components/dashboard/savings-calendar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { formatPeso } from '@/lib/currency';
 import { dashboard } from '@/routes';
 
 const monthlyGoal = 7_200;
@@ -44,10 +45,6 @@ const years = Object.keys(savingsByYear)
 
 const earliestYear = years[0];
 const latestYear = years[years.length - 1];
-
-const formatPeso = (value: number) => {
-    return `₱${Math.abs(value).toLocaleString('en-US')}`;
-};
 
 export default function DashboardMonths() {
     const [year, setYear] = useState(currentYear);
