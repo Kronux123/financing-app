@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\User;
+use Inertia\Testing\AssertableInertia;
 
 test('guests are redirected to the login page', function () {
     $response = $this->get(route('dashboard'));
@@ -13,4 +14,21 @@ test('authenticated users can visit the dashboard', function () {
 
     $response = $this->get(route('dashboard'));
     $response->assertOk();
+});
+
+test('guests are redirected away from the savings calendar', function () {
+    $response = $this->get(route('dashboard.months'));
+    $response->assertRedirect(route('login'));
+});
+
+test('authenticated users can visit the savings calendar', function () {
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    $response = $this->get(route('dashboard.months'));
+
+    $response->assertOk();
+    $response->assertInertia(
+        fn (AssertableInertia $page) => $page->component('months/index')
+    );
 });

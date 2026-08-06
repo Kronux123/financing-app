@@ -59,6 +59,10 @@
     --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
     --color-sidebar-border: var(--sidebar-border);
     --color-sidebar-ring: var(--sidebar-ring);
+
+    --color-goal-behind: var(--goal-behind);
+    --color-goal-close: var(--goal-close);
+    --color-goal-met: var(--goal-met);
 }
 
 :root {
@@ -95,6 +99,16 @@
     --sidebar-accent-foreground: oklch(0.205 0 0);
     --sidebar-border: oklch(0.922 0 0);
     --sidebar-ring: oklch(0.87 0 0);
+
+    /**
+     * Goal-tracking scale. Three hues, not three shades of one, so the tiers
+     * stay apart for colour-blind readers. Validated all-pairs against the
+     * light card surface: worst CVD ΔE 9.2, worst normal-vision ΔE 24.0.
+     * The dark steps in `.dark` are selected for that surface, not flipped.
+     */
+    --goal-behind: #eb6834;
+    --goal-close: #2a78d6;
+    --goal-met: #1baf7a;
 }
 
 .dark {
@@ -130,6 +144,11 @@
     --sidebar-accent-foreground: oklch(0.985 0 0);
     --sidebar-border: oklch(0.269 0 0);
     --sidebar-ring: oklch(0.439 0 0);
+
+    /** Worst CVD ΔE 9.4, worst normal-vision ΔE 20.9 against the dark card. */
+    --goal-behind: #d95926;
+    --goal-close: #3987e5;
+    --goal-met: #199e70;
 }
 
 @layer base {
