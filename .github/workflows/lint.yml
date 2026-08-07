@@ -44,6 +44,14 @@ jobs:
       - name: Generate Application Key
         run: php artisan key:generate
 
+      # resources/js/actions and resources/js/routes are gitignored, so a fresh
+      # checkout has neither. Without them the import resolver cannot place an
+      # `@/actions` or `@/routes` import and import/order fails on files nobody
+      # touched, and types:check fails outright. The tests workflow gets these
+      # for free from `npm run build`; this one has to ask.
+      - name: Generate Wayfinder Types
+        run: php artisan wayfinder:generate
+
       - name: Check PHP Code Style
         run: composer lint:check
 
