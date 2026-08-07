@@ -103,6 +103,26 @@ test('the start date is asked for only on a debt', function () {
         ->assertMissing('@item-started-payables-monthly-0');
 });
 
+test('the end date is optional on a payable and required on a debt', function () {
+    $page = visit(route('finance.edit'));
+
+    $page->type('@income-monthly', '40000')
+        ->click('@add-payables-monthly')
+        ->type('@item-amount-payables-monthly-0', '2500')
+        ->assertAttributeDoesntContain(
+            '@item-ends-payables-monthly-0',
+            'aria-label',
+            'required'
+        )
+        ->click('@item-is-debt-payables-monthly-0')
+        ->assertAttribute('@item-ends-payables-monthly-0', 'aria-required', 'true')
+        ->assertAttributeContains(
+            '@item-ends-payables-monthly-0',
+            'aria-label',
+            'required for a debt'
+        );
+});
+
 test('a start date turns what is left into how far through you are', function () {
     $page = visit(route('finance.edit'));
 
