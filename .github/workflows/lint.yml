@@ -49,8 +49,12 @@ jobs:
       # `@/actions` or `@/routes` import and import/order fails on files nobody
       # touched, and types:check fails outright. The tests workflow gets these
       # for free from `npm run build`; this one has to ask.
+      #
+      # --with-form mirrors `formVariants: true` in vite.config.ts. Leave it off
+      # and the generated code compiles, but every `.form()` call site stops
+      # type checking. Keep the two in step.
       - name: Generate Wayfinder Types
-        run: php artisan wayfinder:generate
+        run: php artisan wayfinder:generate --with-form
 
       - name: Check PHP Code Style
         run: composer lint:check
