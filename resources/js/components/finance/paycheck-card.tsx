@@ -2,14 +2,19 @@ import { ArrowLeftRight, Plus, X } from 'lucide-react';
 import { AmountInput } from '@/components/finance/amount-input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import type { BudgetPlan, ExpenseItem, Paycheck } from '@/lib/budget';
 import {
     allocatedFor,
     allocationShare,
+    enteredTotalFor,
     groupTotal,
+    isRemainderItem,
+    isSingleAmountGroup,
     itemsFor,
+    savingsGroupId,
     unallocatedFor,
 } from '@/lib/budget';
 import { formatPeso } from '@/lib/currency';
@@ -29,7 +34,7 @@ type AllocationTier = {
  * good, whereas planning to spend more than a paycheck holds is not. Orange
  * still marks the problem state, so the two pages stay readable together.
  */
-const tiers: Record<'over' | 'tight' | 'clear', AllocationTier> = {
+const tiers: Record<'over' | 'tight' | 'clear' | 'swept', AllocationTier> = {
     over: {
         label: 'Over-allocated',
         mark: 'bg-goal-behind',
@@ -45,11 +50,27 @@ const tiers: Record<'over' | 'tight' | 'clear', AllocationTier> = {
         mark: 'bg-goal-met',
         surface: 'bg-goal-met/10',
     },
+    swept: {
+        label: 'Fully allocated',
+        mark: 'bg-goal-met',
+        surface: 'bg-goal-met/10',
+    },
 };
 
-const allocationTierFor = (share: number): AllocationTier => {
+const allocationTierFor = (
+    share: number,
+    savesRemainder: boolean,
+): AllocationTier => {
     if (share > 1) {
         return tiers.over;
+    }
+
+    /**
+     * Nothing is sitting idle once the remainder is swept, so the usual warning
+     * for spending close to the whole paycheck would be reading it backwards.
+     */
+    if (savesRemainder) {
+        return tiers.swept;
     }
 
     if (share >= 0.9) {
@@ -67,12 +88,66 @@ const paydayDescription = (paycheck: Paycheck): string => {
     return `Paid on the ${paycheck.dayOfMonth}th`;
 };
 
+/** The swept savings line, which is derived and so cannot be edited here. */
+function RemainderRow({
+    paycheckId,
+    item,
+}: {
+    paycheckId: string;
+    item: ExpenseItem;
+}) {
+    return (
+        <div className="flex items-center justify-between gap-2 rounded-md bg-goal-met/10 px-2.5 py-2">
+            <p className="text-sm">{item.name}</p>
+            <p
+                data-test={`remainder-${paycheckId}`}
+                className="text-sm font-medium tabular-nums"
+            >
+                {formatPeso(item.amount)}
+            </p>
+        </div>
+    );
+}
+
+function SweepToggle({
+    paycheckId,
+    savesRemainder,
+    onChange,
+}: {
+    paycheckId: string;
+    savesRemainder: boolean;
+    onChange: (savesRemainder: boolean) => void;
+}) {
+    return (
+        <div className="flex items-center gap-2 pt-0.5">
+            <Checkbox
+                id={`sweep-${paycheckId}`}
+                data-test={`sweep-${paycheckId}`}
+                checked={savesRemainder}
+                onCheckedChange={(state) => onChange(state === true)}
+            />
+            <Label
+                htmlFor={`sweep-${paycheckId}`}
+                className="text-xs font-normal text-muted-foreground"
+            >
+                Save whatever is left over
+            </Label>
+        </div>
+    );
+}
+
 type PaycheckCardProps = {
     plan: BudgetPlan;
     paycheck: Paycheck;
     /** The paycheck an expense can be moved to; omitted when pay is monthly. */
     otherPaycheck?: Paycheck;
     onIncomeChange: (amount: number) => void;
+    onSavesRemainderChange: (savesRemainder: boolean) => void;
+    onGroupAmountChange: (
+        groupId: string,
+        paycheckId: string,
+        amount: number,
+    ) => void;
     onItemAdd: (groupId: string, paycheckId: string) => void;
     onItemChange: (
         groupId: string,
@@ -87,14 +162,17 @@ export function PaycheckCard({
     paycheck,
     otherPaycheck,
     onIncomeChange,
+    onSavesRemainderChange,
+    onGroupAmountChange,
     onItemAdd,
     onItemChange,
     onItemRemove,
 }: PaycheckCardProps) {
+    const savesRemainder = paycheck.savesRemainder === true;
     const allocated = allocatedFor(plan, paycheck.id);
     const leftover = unallocatedFor(plan, paycheck.id);
     const share = allocationShare(plan, paycheck.id);
-    const tier = allocationTierFor(share);
+    const tier = allocationTierFor(share, savesRemainder);
     const percent = Math.round(share * 100);
 
     return (
@@ -176,7 +254,57 @@ export function PaycheckCard({
 
                 <div className="space-y-4">
                     {plan.groups.map((group) => {
-                        const items = itemsFor(group, paycheck.id);
+                        const funded = itemsFor(group, paycheck.id);
+                        const items = funded.filter(
+                            (item) => !isRemainderItem(item),
+                        );
+                        const remainder = funded.find(isRemainderItem);
+
+                        if (isSingleAmountGroup(group)) {
+                            return (
+                                <div key={group.id} className="space-y-2">
+                                    <div className="flex items-center justify-between gap-2">
+                                        <Label
+                                            htmlFor={`amount-${group.id}-${paycheck.id}`}
+                                            className="text-xs font-medium tracking-wide text-muted-foreground uppercase"
+                                        >
+                                            {group.name}
+                                        </Label>
+                                        <AmountInput
+                                            id={`amount-${group.id}-${paycheck.id}`}
+                                            data-test={`amount-${group.id}-${paycheck.id}`}
+                                            value={enteredTotalFor(
+                                                group,
+                                                paycheck.id,
+                                            )}
+                                            onValueChange={(amount) =>
+                                                onGroupAmountChange(
+                                                    group.id,
+                                                    paycheck.id,
+                                                    amount,
+                                                )
+                                            }
+                                            className="w-32 shrink-0"
+                                        />
+                                    </div>
+
+                                    {remainder && (
+                                        <RemainderRow
+                                            paycheckId={paycheck.id}
+                                            item={remainder}
+                                        />
+                                    )}
+
+                                    {group.id === savingsGroupId && (
+                                        <SweepToggle
+                                            paycheckId={paycheck.id}
+                                            savesRemainder={savesRemainder}
+                                            onChange={onSavesRemainderChange}
+                                        />
+                                    )}
+                                </div>
+                            );
+                        }
 
                         return (
                             <div key={group.id} className="space-y-2">
@@ -194,7 +322,7 @@ export function PaycheckCard({
                                 {items.map((item, index) => (
                                     <div
                                         key={item.id}
-                                        className="flex items-center gap-2"
+                                        className="flex flex-wrap items-center gap-2"
                                     >
                                         <Input
                                             aria-label={`${group.name} expense name`}
@@ -211,7 +339,7 @@ export function PaycheckCard({
                                                     },
                                                 )
                                             }
-                                            className="h-9 min-w-0 flex-1"
+                                            className="h-9 min-w-32 flex-1"
                                         />
                                         <AmountInput
                                             label={`${item.name || 'Expense'} amount`}
@@ -227,6 +355,25 @@ export function PaycheckCard({
                                                 )
                                             }
                                             className="w-28 shrink-0"
+                                        />
+                                        <Input
+                                            type="date"
+                                            aria-label={`${item.name || 'Expense'} end date, optional`}
+                                            data-test={`item-ends-${group.id}-${paycheck.id}-${index}`}
+                                            value={item.endsOn ?? ''}
+                                            onChange={(event) =>
+                                                onItemChange(
+                                                    group.id,
+                                                    item.id,
+                                                    {
+                                                        endsOn:
+                                                            event.target
+                                                                .value ||
+                                                            undefined,
+                                                    },
+                                                )
+                                            }
+                                            className="h-9 w-36 shrink-0 text-xs [color-scheme:light] dark:[color-scheme:dark]"
                                         />
                                         {otherPaycheck && (
                                             <Button
@@ -274,7 +421,9 @@ export function PaycheckCard({
                                     variant="ghost"
                                     size="sm"
                                     data-test={`add-${group.id}-${paycheck.id}`}
-                                    className="h-8 w-full justify-start text-muted-foreground"
+                                    // Muted text drops to 4.34:1 once the ghost
+                                    // hover background lands under it.
+                                    className="h-8 w-full justify-start text-foreground/70"
                                     onClick={() =>
                                         onItemAdd(group.id, paycheck.id)
                                     }
@@ -282,6 +431,11 @@ export function PaycheckCard({
                                     <Plus aria-hidden className="size-3.5" />
                                     Add to {group.name}
                                 </Button>
+
+                                <p className="text-xs text-muted-foreground">
+                                    Give a payable that stops, like an
+                                    installment, its end date.
+                                </p>
                             </div>
                         );
                     })}

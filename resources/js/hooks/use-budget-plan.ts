@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from 'react';
 import type { BudgetPlan } from '@/lib/budget';
-import { isBudgetPlan } from '@/lib/budget';
+import { migratePlan } from '@/lib/budget';
 
 export const budgetPlanStorageKey = 'budgetPlan';
 
@@ -27,15 +27,15 @@ const readStorage = (): BudgetPlan | null => {
     }
 
     try {
-        const parsed: unknown = JSON.parse(stored);
+        const migrated = migratePlan(JSON.parse(stored));
 
-        if (!isBudgetPlan(parsed)) {
+        if (!migrated) {
             window.localStorage.removeItem(budgetPlanStorageKey);
 
             return null;
         }
 
-        return parsed;
+        return migrated;
     } catch {
         window.localStorage.removeItem(budgetPlanStorageKey);
 

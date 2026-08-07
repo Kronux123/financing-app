@@ -1,14 +1,27 @@
 import { Head, Link } from '@inertiajs/react';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { EmergencyFundCard } from '@/components/finance/emergency-fund-card';
 import { PaycheckCard } from '@/components/finance/paycheck-card';
 import { PlanSummary } from '@/components/finance/plan-summary';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { saveBudgetPlan, useStoredBudgetPlan } from '@/hooks/use-budget-plan';
-import type { BudgetPlan, ExpenseItem, PayCadence } from '@/lib/budget';
-import { cadenceOptions, createId, createPlan, reassignTo } from '@/lib/budget';
+import type {
+    BudgetPlan,
+    EmergencyFund,
+    ExpenseItem,
+    PayCadence,
+} from '@/lib/budget';
+import {
+    cadenceOptions,
+    createId,
+    createPlan,
+    reassignTo,
+    withGroupAmount,
+    withSweptRemainders,
+} from '@/lib/budget';
 import { dashboard } from '@/routes';
 import { edit as financeRoute } from '@/routes/finance';
 
@@ -42,8 +55,12 @@ export default function Finance() {
     const plan = draft.plan;
     const isDirty = draft.plan !== draft.saved;
 
+    /**
+     * Every edit passes through the sweep, so a paycheck saving its remainder
+     * keeps that line correct no matter which field moved it.
+     */
     const updatePlan = (next: BudgetPlan) => {
-        setDraft({ ...draft, plan: next });
+        setDraft({ ...draft, plan: withSweptRemainders(next) });
     };
 
     const handleCadenceChange = (value: string) => {
@@ -61,6 +78,35 @@ export default function Finance() {
                 paycheck.id === paycheckId ? { ...paycheck, amount } : paycheck,
             ),
         });
+    };
+
+    const handleSavesRemainderChange = (
+        paycheckId: string,
+        savesRemainder: boolean,
+    ) => {
+        updatePlan({
+            ...plan,
+            paychecks: plan.paychecks.map((paycheck) =>
+                paycheck.id === paycheckId
+                    ? { ...paycheck, savesRemainder }
+                    : paycheck,
+            ),
+        });
+    };
+
+    const handleEmergencyFundChange = (patch: Partial<EmergencyFund>) => {
+        updatePlan({
+            ...plan,
+            emergencyFund: { ...plan.emergencyFund, ...patch },
+        });
+    };
+
+    const handleGroupAmountChange = (
+        groupId: string,
+        paycheckId: string,
+        amount: number,
+    ) => {
+        updatePlan(withGroupAmount(plan, groupId, paycheckId, amount));
     };
 
     const handleItemAdd = (groupId: string, paycheckId: string) => {
@@ -207,6 +253,15 @@ export default function Finance() {
                                     onIncomeChange={(amount) =>
                                         handleIncomeChange(paycheck.id, amount)
                                     }
+                                    onSavesRemainderChange={(savesRemainder) =>
+                                        handleSavesRemainderChange(
+                                            paycheck.id,
+                                            savesRemainder,
+                                        )
+                                    }
+                                    onGroupAmountChange={
+                                        handleGroupAmountChange
+                                    }
                                     onItemAdd={handleItemAdd}
                                     onItemChange={handleItemChange}
                                     onItemRemove={handleItemRemove}
@@ -217,6 +272,16 @@ export default function Finance() {
 
                     <div className="space-y-4">
                         <PlanSummary plan={plan} />
+
+                        <EmergencyFundCard
+                            plan={plan}
+                            onMonthsOfCoverChange={(monthsOfCover) =>
+                                handleEmergencyFundChange({ monthsOfCover })
+                            }
+                            onBalanceChange={(balance) =>
+                                handleEmergencyFundChange({ balance })
+                            }
+                        />
 
                         <Button variant="secondary" asChild size="sm">
                             <Link href={dashboard()}>Back to dashboard</Link>

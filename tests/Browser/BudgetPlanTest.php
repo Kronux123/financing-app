@@ -11,8 +11,9 @@ test('the budget plan renders for an authenticated user', function () {
 
     $page->assertSee('Budget plan')
         ->assertSee('How you get paid')
-        ->assertSee('Needs')
-        ->assertSee('Utilities')
+        ->assertSee('Payables')
+        ->assertSee('Allowance')
+        ->assertSee('Savings')
         ->assertNoJavaScriptErrors();
 });
 
@@ -60,9 +61,9 @@ test('an expense reduces the leftover on its paycheck', function () {
 
     $page->type('@income-monthly', '60000')
         ->assertSeeIn('@leftover-monthly', '₱60,000')
-        ->click('@add-needs-monthly')
-        ->type('@item-name-needs-monthly-0', 'Rent')
-        ->type('@item-amount-needs-monthly-0', '15000')
+        ->click('@add-payables-monthly')
+        ->type('@item-name-payables-monthly-0', 'Rent')
+        ->type('@item-amount-payables-monthly-0', '15000')
         ->assertSeeIn('@allocated-monthly', '₱15,000')
         ->assertSeeIn('@leftover-monthly', '₱45,000')
         ->assertSee('Comfortable');
@@ -72,10 +73,9 @@ test('expenses across groups roll up into the monthly summary', function () {
     $page = visit(route('finance.edit'));
 
     $page->type('@income-monthly', '50000')
-        ->click('@add-needs-monthly')
-        ->type('@item-amount-needs-monthly-0', '20000')
-        ->click('@add-utilities-monthly')
-        ->type('@item-amount-utilities-monthly-0', '5000')
+        ->click('@add-payables-monthly')
+        ->type('@item-amount-payables-monthly-0', '20000')
+        ->type('@amount-allowance-monthly', '5000')
         ->assertSeeIn('@plan-income', '₱50,000')
         ->assertSeeIn('@plan-allocated', '₱25,000')
         ->assertSeeIn('@plan-unallocated', '₱25,000');
@@ -85,8 +85,8 @@ test('planning more than a paycheck holds flags it as over-allocated', function 
     $page = visit(route('finance.edit'));
 
     $page->type('@income-monthly', '10000')
-        ->click('@add-needs-monthly')
-        ->type('@item-amount-needs-monthly-0', '12000')
+        ->click('@add-payables-monthly')
+        ->type('@item-amount-payables-monthly-0', '12000')
         ->assertSeeIn('@paycheck-monthly', 'Over-allocated')
         ->assertSeeIn('@leftover-monthly', '₱2,000')
         ->assertSee('Over budget');
@@ -98,12 +98,12 @@ test('an expense can be moved to the other paycheck', function () {
     $page->click('@cadence-semi-monthly')
         ->type('@income-mid-month', '30000')
         ->type('@income-end-month', '30000')
-        ->click('@add-needs-mid-month')
-        ->type('@item-name-needs-mid-month-0', 'Rent')
-        ->type('@item-amount-needs-mid-month-0', '12000')
+        ->click('@add-payables-mid-month')
+        ->type('@item-name-payables-mid-month-0', 'Rent')
+        ->type('@item-amount-payables-mid-month-0', '12000')
         ->assertSeeIn('@leftover-mid-month', '₱18,000')
         ->assertSeeIn('@leftover-end-month', '₱30,000')
-        ->click('@move-needs-mid-month-0')
+        ->click('@move-payables-mid-month-0')
         ->assertSeeIn('@leftover-mid-month', '₱30,000')
         ->assertSeeIn('@leftover-end-month', '₱18,000');
 });
@@ -112,11 +112,11 @@ test('an expense can be removed', function () {
     $page = visit(route('finance.edit'));
 
     $page->type('@income-monthly', '40000')
-        ->click('@add-needs-monthly')
-        ->type('@item-name-needs-monthly-0', 'Rent')
-        ->type('@item-amount-needs-monthly-0', '10000')
+        ->click('@add-payables-monthly')
+        ->type('@item-name-payables-monthly-0', 'Rent')
+        ->type('@item-amount-payables-monthly-0', '10000')
         ->assertSeeIn('@leftover-monthly', '₱30,000')
-        ->click('@remove-needs-monthly-0')
+        ->click('@remove-payables-monthly-0')
         ->assertSeeIn('@leftover-monthly', '₱40,000');
 });
 
@@ -126,9 +126,9 @@ test('a saved plan survives a reload', function () {
     $page->click('@cadence-semi-monthly')
         ->type('@income-mid-month', '25000')
         ->type('@income-end-month', '25000')
-        ->click('@add-utilities-mid-month')
-        ->type('@item-name-utilities-mid-month-0', 'Electricity')
-        ->type('@item-amount-utilities-mid-month-0', '3200')
+        ->click('@add-payables-mid-month')
+        ->type('@item-name-payables-mid-month-0', 'Electricity')
+        ->type('@item-amount-payables-mid-month-0', '3200')
         ->click('@save-plan');
 
     // refresh() reloads in the same browser context, so local storage survives.
@@ -138,7 +138,7 @@ test('a saved plan survives a reload', function () {
         ->assertPathIs('/finance')
         ->assertPresent('@paycheck-mid-month')
         ->assertValue('@income-mid-month', '25000')
-        ->assertValue('@item-name-utilities-mid-month-0', 'Electricity')
+        ->assertValue('@item-name-payables-mid-month-0', 'Electricity')
         ->assertSeeIn('@leftover-mid-month', '₱21,800');
 });
 
@@ -154,16 +154,277 @@ test('an unsaved plan is not persisted', function () {
         ->assertDontSee('Unsaved changes');
 });
 
+test('a payable can carry an end date that survives a reload', function () {
+    $page = visit(route('finance.edit'));
+
+    $page->type('@income-monthly', '30000')
+        ->click('@add-payables-monthly')
+        ->type('@item-name-payables-monthly-0', 'Laptop installment')
+        ->type('@item-amount-payables-monthly-0', '2500')
+        ->type('@item-ends-payables-monthly-0', '2026-12-31')
+        ->click('@save-plan');
+
+    $page->refresh()
+        ->assertValue('@item-name-payables-monthly-0', 'Laptop installment')
+        ->assertValue('@item-ends-payables-monthly-0', '2026-12-31')
+        ->assertSeeIn('@leftover-monthly', '₱27,500');
+});
+
+test('a payable without an end date is left alone', function () {
+    $page = visit(route('finance.edit'));
+
+    $page->type('@income-monthly', '30000')
+        ->click('@add-payables-monthly')
+        ->type('@item-name-payables-monthly-0', 'Rent')
+        ->type('@item-amount-payables-monthly-0', '9000')
+        ->assertValue('@item-ends-payables-monthly-0', '')
+        ->assertSeeIn('@leftover-monthly', '₱21,000');
+});
+
+test('allowance and savings take one figure instead of itemised rows', function () {
+    $page = visit(route('finance.edit'));
+
+    $page->type('@income-monthly', '30000')
+        ->type('@amount-allowance-monthly', '4000')
+        ->type('@amount-savings-monthly', '6000')
+        ->assertPresent('@add-payables-monthly')
+        ->assertMissing('@add-allowance-monthly')
+        ->assertMissing('@add-savings-monthly')
+        ->assertSeeIn('@allocated-monthly', '₱10,000')
+        ->assertSeeIn('@leftover-monthly', '₱20,000');
+});
+
+test('retyping a single figure replaces it rather than adding to it', function () {
+    $page = visit(route('finance.edit'));
+
+    $page->type('@income-monthly', '20000')
+        ->type('@amount-allowance-monthly', '3000')
+        ->assertSeeIn('@allocated-monthly', '₱3,000')
+        ->type('@amount-allowance-monthly', '5000')
+        ->assertSeeIn('@allocated-monthly', '₱5,000')
+        ->assertSeeIn('@leftover-monthly', '₱15,000');
+});
+
+test('a single figure survives a reload', function () {
+    $page = visit(route('finance.edit'));
+
+    $page->type('@income-monthly', '35000')
+        ->type('@amount-savings-monthly', '7500')
+        ->click('@save-plan');
+
+    $page->refresh()
+        ->assertValue('@amount-savings-monthly', '7500')
+        ->assertSeeIn('@leftover-monthly', '₱27,500');
+});
+
+test('saving the remainder moves the whole leftover into savings', function () {
+    $page = visit(route('finance.edit'));
+
+    $page->type('@income-monthly', '60000')
+        ->click('@add-payables-monthly')
+        ->type('@item-amount-payables-monthly-0', '15000')
+        ->assertSeeIn('@leftover-monthly', '₱45,000')
+        ->click('@sweep-monthly')
+        ->assertSeeIn('@remainder-monthly', '₱45,000')
+        ->assertSeeIn('@leftover-monthly', '₱0')
+        ->assertSeeIn('@allocated-monthly', '₱60,000')
+        ->assertSeeIn('@paycheck-monthly', 'Fully allocated');
+});
+
+test('the saved remainder follows every later edit', function () {
+    $page = visit(route('finance.edit'));
+
+    $page->type('@income-monthly', '40000')
+        ->click('@sweep-monthly')
+        ->assertSeeIn('@remainder-monthly', '₱40,000')
+        ->type('@amount-allowance-monthly', '6000')
+        ->assertSeeIn('@remainder-monthly', '₱34,000')
+        ->type('@amount-allowance-monthly', '0')
+        ->assertSeeIn('@remainder-monthly', '₱40,000');
+});
+
+test('turning the saved remainder off hands the leftover back', function () {
+    $page = visit(route('finance.edit'));
+
+    $page->type('@income-monthly', '30000')
+        ->click('@sweep-monthly')
+        ->assertSeeIn('@leftover-monthly', '₱0')
+        ->click('@sweep-monthly')
+        ->assertMissing('@remainder-monthly')
+        ->assertSeeIn('@leftover-monthly', '₱30,000')
+        ->assertSeeIn('@plan-allocated', '₱0');
+});
+
+test('an over-allocated paycheck saves nothing', function () {
+    $page = visit(route('finance.edit'));
+
+    $page->type('@income-monthly', '20000')
+        ->click('@add-payables-monthly')
+        ->type('@item-amount-payables-monthly-0', '25000')
+        ->click('@sweep-monthly')
+        ->assertSeeIn('@remainder-monthly', '₱0')
+        ->assertSeeIn('@paycheck-monthly', 'Over-allocated')
+        ->assertSeeIn('@leftover-monthly', '₱5,000');
+});
+
+test('each paycheck saves its own remainder', function () {
+    $page = visit(route('finance.edit'));
+
+    $page->click('@cadence-semi-monthly')
+        ->type('@income-mid-month', '25000')
+        ->type('@income-end-month', '25000')
+        ->click('@add-payables-mid-month')
+        ->type('@item-amount-payables-mid-month-0', '10000')
+        ->click('@sweep-mid-month')
+        ->assertSeeIn('@remainder-mid-month', '₱15,000')
+        ->assertMissing('@remainder-end-month')
+        ->assertSeeIn('@leftover-end-month', '₱25,000');
+});
+
+test('a saved remainder survives a reload', function () {
+    $page = visit(route('finance.edit'));
+
+    $page->type('@income-monthly', '45000')
+        ->click('@add-payables-monthly')
+        ->type('@item-amount-payables-monthly-0', '5000')
+        ->click('@sweep-monthly')
+        ->click('@save-plan');
+
+    $page->refresh()
+        ->assertSeeIn('@remainder-monthly', '₱40,000')
+        ->assertSeeIn('@leftover-monthly', '₱0');
+});
+
+test('the emergency fund target is months of payables and allowance', function () {
+    $page = visit(route('finance.edit'));
+
+    $page->type('@income-monthly', '30000')
+        ->click('@add-payables-monthly')
+        ->type('@item-amount-payables-monthly-0', '10000')
+        ->type('@amount-allowance-monthly', '5000')
+        ->assertSeeIn('@fund-target', '₱45,000')
+        ->click('@cover-6')
+        ->assertSeeIn('@fund-target', '₱90,000')
+        ->click('@cover-3')
+        ->assertSeeIn('@fund-target', '₱45,000');
+});
+
+test('savings are not counted as essentials', function () {
+    $page = visit(route('finance.edit'));
+
+    $page->type('@income-monthly', '30000')
+        ->click('@add-payables-monthly')
+        ->type('@item-amount-payables-monthly-0', '10000')
+        ->assertSeeIn('@fund-target', '₱30,000')
+        ->type('@amount-savings-monthly', '4000')
+        ->assertSeeIn('@fund-target', '₱30,000');
+});
+
+test('the target is the same on either cadence', function () {
+    $page = visit(route('finance.edit'));
+
+    $page->type('@income-monthly', '30000')
+        ->click('@add-payables-monthly')
+        ->type('@item-amount-payables-monthly-0', '10000')
+        ->type('@amount-allowance-monthly', '5000')
+        ->assertSeeIn('@fund-target', '₱45,000')
+        ->click('@cadence-semi-monthly')
+        ->assertSeeIn('@fund-target', '₱45,000');
+});
+
+test('savings fill the emergency fund before the pot', function () {
+    $page = visit(route('finance.edit'));
+
+    $page->type('@income-monthly', '30000')
+        ->click('@add-payables-monthly')
+        ->type('@item-amount-payables-monthly-0', '10000')
+        ->type('@amount-savings-monthly', '5000')
+        ->assertSeeIn('@fund-target', '₱30,000')
+        ->assertSeeIn('@fund-to-emergency', '₱5,000')
+        ->assertSeeIn('@fund-to-pot', '₱0')
+        ->assertSeeIn('@fund-forecast', 'Full in 6 months');
+});
+
+test('a part-filled fund takes only what it needs and the rest overflows', function () {
+    $page = visit(route('finance.edit'));
+
+    $page->type('@income-monthly', '30000')
+        ->click('@add-payables-monthly')
+        ->type('@item-amount-payables-monthly-0', '10000')
+        ->type('@amount-savings-monthly', '5000')
+        ->type('@fund-balance', '28000')
+        ->assertSeeIn('@fund-to-emergency', '₱2,000')
+        ->assertSeeIn('@fund-to-pot', '₱3,000')
+        ->assertSeeIn('@fund-forecast', 'Full in 1 month');
+});
+
+test('a full fund sends everything to the pot', function () {
+    $page = visit(route('finance.edit'));
+
+    $page->type('@income-monthly', '30000')
+        ->click('@add-payables-monthly')
+        ->type('@item-amount-payables-monthly-0', '10000')
+        ->type('@amount-savings-monthly', '5000')
+        ->type('@fund-balance', '30000')
+        ->assertSeeIn('@fund-to-emergency', '₱0')
+        ->assertSeeIn('@fund-to-pot', '₱5,000')
+        ->assertSee('Fully funded')
+        ->assertSeeIn('@fund-forecast', 'everything now lands in the pot');
+});
+
+test('an unsized fund says so rather than claiming to be funded', function () {
+    $page = visit(route('finance.edit'));
+
+    $page->type('@income-monthly', '30000')
+        ->type('@amount-savings-monthly', '5000')
+        ->assertSee('Not sized yet')
+        ->assertSeeIn('@fund-to-pot', '₱5,000')
+        ->assertSeeIn('@fund-forecast', 'until the fund is sized');
+});
+
+test('the emergency fund survives a reload', function () {
+    $page = visit(route('finance.edit'));
+
+    $page->type('@income-monthly', '30000')
+        ->click('@add-payables-monthly')
+        ->type('@item-amount-payables-monthly-0', '10000')
+        ->click('@cover-6')
+        ->type('@fund-balance', '12000')
+        ->click('@save-plan');
+
+    $page->refresh()
+        ->assertValue('@fund-balance', '12000')
+        ->assertSeeIn('@fund-target', '₱60,000');
+});
+
+test('the dashboard shows the emergency fund instead of samples', function () {
+    $page = visit(route('finance.edit'));
+
+    $page->type('@income-monthly', '30000')
+        ->click('@add-payables-monthly')
+        ->type('@item-amount-payables-monthly-0', '10000')
+        ->type('@amount-savings-monthly', '5000')
+        ->type('@fund-balance', '12000')
+        ->click('@save-plan');
+
+    $page->click('Back to dashboard')
+        ->assertPathIs('/dashboard')
+        ->assertSee('Emergency fund')
+        ->assertSeeIn('@dashboard-saved', '₱12,000')
+        ->assertSee('₱30,000 target')
+        ->assertSee('Still to go')
+        ->assertDontSee('Emergency buffer')
+        ->assertNoJavaScriptErrors();
+});
+
 test('the dashboard reflects a saved plan', function () {
     $page = visit(route('finance.edit'));
 
     $page->type('@income-monthly', '60000')
-        ->click('@add-needs-monthly')
-        ->type('@item-name-needs-monthly-0', 'Rent')
-        ->type('@item-amount-needs-monthly-0', '15000')
-        ->click('@add-savings-monthly')
-        ->type('@item-name-savings-monthly-0', 'Emergency fund')
-        ->type('@item-amount-savings-monthly-0', '10000')
+        ->click('@add-payables-monthly')
+        ->type('@item-name-payables-monthly-0', 'Rent')
+        ->type('@item-amount-payables-monthly-0', '15000')
+        ->type('@amount-savings-monthly', '10000')
         ->click('@save-plan');
 
     $page->click('Back to dashboard')
@@ -188,7 +449,8 @@ test('the budget plan has no accessibility issues', function () {
     $page = visit(route('finance.edit'));
 
     $page->click('@cadence-semi-monthly')
-        ->click('@add-needs-mid-month')
+        ->click('@add-payables-mid-month')
+        ->click('@sweep-mid-month')
         ->assertNoAccessibilityIssues();
 });
 
@@ -199,8 +461,11 @@ test('the budget plan has no accessibility issues in dark mode', function () {
 
     $page->click('@cadence-semi-monthly')
         ->type('@income-mid-month', '30000')
-        ->click('@add-needs-mid-month')
-        ->type('@item-amount-needs-mid-month-0', '29000')
+        ->click('@add-payables-mid-month')
+        ->type('@item-amount-payables-mid-month-0', '29000')
         ->assertSeeIn('@paycheck-mid-month', 'Tight')
+        ->assertNoAccessibilityIssues()
+        ->click('@sweep-mid-month')
+        ->assertSeeIn('@paycheck-mid-month', 'Fully allocated')
         ->assertNoAccessibilityIssues();
 });

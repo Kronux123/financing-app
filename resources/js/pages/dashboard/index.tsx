@@ -4,7 +4,13 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useStoredBudgetPlan } from '@/hooks/use-budget-plan';
 import type { BudgetPlan } from '@/lib/budget';
-import { groupTotal, isPlanPopulated, planTotals } from '@/lib/budget';
+import {
+    groupTotal,
+    isPlanPopulated,
+    planTotals,
+    savingsGroupId,
+    savingsSplit,
+} from '@/lib/budget';
 import { formatPeso, formatSigned } from '@/lib/currency';
 import { dashboard } from '@/routes';
 import dashboardRoutes from '@/routes/dashboard';
@@ -15,11 +21,11 @@ import { edit as financeRoute } from '@/routes/finance';
  * rather than a forward-looking plan. These stay sample data until the backend
  * release gives them somewhere real to come from.
  */
-const savingsGoal = 108_000;
-const totalSaved = 82_400;
+const sampleSavingsGoal = 108_000;
+const sampleTotalSaved = 82_400;
 const sampleMonthlyGoal = 7_200;
 
-const supportingStats = [
+const sampleSupportingStats = [
     { label: 'Average monthly save', value: 6_880 },
     { label: 'Emergency buffer', value: 18_200 },
 ];
@@ -57,13 +63,15 @@ const categoryColors = [
     'bg-teal-500',
 ];
 
-const savingsGroupId = 'savings';
-
 type DerivedFigures = {
     monthlyGoal: number;
     monthlyExpenses: number;
     projectedCashflow: number;
     categories: { name: string; amount: number; color: string }[];
+    /** The emergency fund balance once a plan exists, sample data before that. */
+    totalSaved: number;
+    savingsGoal: number;
+    supportingStats: { label: string; value: number }[];
 };
 
 const withColors = (
@@ -86,6 +94,9 @@ const deriveFigures = (plan: BudgetPlan | null): DerivedFigures => {
             monthlyExpenses: -4_125,
             projectedCashflow: 1_320,
             categories: withColors(sampleCategories),
+            totalSaved: sampleTotalSaved,
+            savingsGoal: sampleSavingsGoal,
+            supportingStats: sampleSupportingStats,
         };
     }
 
@@ -94,6 +105,7 @@ const deriveFigures = (plan: BudgetPlan | null): DerivedFigures => {
         (group) => group.id === savingsGroupId,
     );
     const plannedSavings = savingsGroup ? groupTotal(savingsGroup) : 0;
+    const split = savingsSplit(plan);
 
     return {
         monthlyGoal: plannedSavings > 0 ? plannedSavings : sampleMonthlyGoal,
@@ -107,16 +119,31 @@ const deriveFigures = (plan: BudgetPlan | null): DerivedFigures => {
                 }))
                 .filter((group) => group.amount > 0),
         ),
+        totalSaved: split.balance,
+        savingsGoal: split.target,
+        supportingStats: [
+            { label: 'Going to savings', value: split.saved },
+            { label: 'Still to go', value: split.gap },
+        ],
     };
 };
 
 export default function Dashboard() {
     const plan = useStoredBudgetPlan();
     const hasPlan = plan !== null && isPlanPopulated(plan);
-    const { monthlyGoal, monthlyExpenses, projectedCashflow, categories } =
-        deriveFigures(plan);
+    const {
+        monthlyGoal,
+        monthlyExpenses,
+        projectedCashflow,
+        categories,
+        totalSaved,
+        savingsGoal,
+        supportingStats,
+    } = deriveFigures(plan);
 
-    const fundedRatio = totalSaved / savingsGoal;
+    // A plan with no payables yet has nothing to size a fund against.
+    const fundedRatio =
+        savingsGoal > 0 ? Math.min(totalSaved / savingsGoal, 1) : 0;
     const categoryTotal = categories.reduce(
         (sum, item) => sum + item.amount,
         0,
@@ -172,14 +199,18 @@ export default function Dashboard() {
                     <CardContent className="flex flex-col gap-6 p-6 lg:flex-row lg:items-end lg:justify-between">
                         <div className="min-w-0">
                             <p className="text-sm text-muted-foreground">
-                                Total saved
+                                {hasPlan ? 'Emergency fund' : 'Total saved'}
                             </p>
-                            <p className="mt-1 text-4xl font-semibold tracking-tight tabular-nums">
+                            <p
+                                data-test="dashboard-saved"
+                                className="mt-1 text-4xl font-semibold tracking-tight tabular-nums"
+                            >
                                 {formatPeso(totalSaved)}
                             </p>
                             <p className="mt-2 text-sm text-muted-foreground tabular-nums">
                                 {Math.round(fundedRatio * 100)}% of your{' '}
-                                {formatPeso(savingsGoal)} goal
+                                {formatPeso(savingsGoal)}{' '}
+                                {hasPlan ? 'target' : 'goal'}
                             </p>
 
                             <div
@@ -187,7 +218,11 @@ export default function Dashboard() {
                                 aria-valuenow={Math.round(fundedRatio * 100)}
                                 aria-valuemin={0}
                                 aria-valuemax={100}
-                                aria-label="Savings goal progress"
+                                aria-label={
+                                    hasPlan
+                                        ? 'Emergency fund progress'
+                                        : 'Savings goal progress'
+                                }
                                 className="mt-4 h-2 w-full overflow-hidden rounded-full bg-muted lg:w-80"
                             >
                                 <div
