@@ -20,6 +20,90 @@ test('the dashboard renders every card', function () {
         ->assertNoJavaScriptErrors();
 });
 
+/** An end date leaving exactly `$months` payments to make, counting this one. */
+function endsInMonths(int $months): string
+{
+    return now()->startOfMonth()->addMonths($months - 1)->endOfMonth()->format('Y-m-d');
+}
+
+test('projected cashflow names the payable that is about to end', function () {
+    $page = visit(route('finance.edit'));
+
+    $page->type('@income-monthly', '40000')
+        ->click('@add-payables-monthly')
+        ->type('@item-name-payables-monthly-0', 'Laptop installment')
+        ->type('@item-amount-payables-monthly-0', '2500')
+        ->type('@item-ends-payables-monthly-0', endsInMonths(6))
+        ->click('@save-plan')
+        ->click('Back to dashboard')
+        ->assertSee('Projected cashflow')
+        ->assertSee('+₱2,500')
+        ->assertSee('when Laptop installment ends');
+});
+
+test('projected cashflow sums several endings and counts them', function () {
+    $page = visit(route('finance.edit'));
+
+    $page->type('@income-monthly', '40000')
+        ->click('@add-payables-monthly')
+        ->type('@item-name-payables-monthly-0', 'Laptop installment')
+        ->type('@item-amount-payables-monthly-0', '2500')
+        ->type('@item-ends-payables-monthly-0', endsInMonths(6))
+        ->click('@add-payables-monthly')
+        ->type('@item-name-payables-monthly-1', 'Phone plan')
+        ->type('@item-amount-payables-monthly-1', '1000')
+        ->type('@item-ends-payables-monthly-1', endsInMonths(9))
+        ->click('@save-plan')
+        ->click('Back to dashboard')
+        ->assertSee('+₱3,500')
+        ->assertSee('across 2 payables');
+});
+
+test('projected cashflow ignores a payable ending beyond the window', function () {
+    $page = visit(route('finance.edit'));
+
+    $page->type('@income-monthly', '40000')
+        ->click('@add-payables-monthly')
+        ->type('@item-name-payables-monthly-0', 'Car loan')
+        ->type('@item-amount-payables-monthly-0', '5000')
+        ->type('@item-ends-payables-monthly-0', endsInMonths(30))
+        ->click('@save-plan')
+        ->click('Back to dashboard')
+        ->assertSee('Nothing ends in the next 12 months')
+        ->assertDontSee('+₱5,000');
+});
+
+// The old tile showed unallocated, which the sweep drives to exactly zero — so
+// it read ₱0 for anyone using it. This one is about payables finishing, and the
+// sweep has nothing to do with it.
+test('projected cashflow survives sweeping the remainder to savings', function () {
+    $page = visit(route('finance.edit'));
+
+    $page->type('@income-monthly', '40000')
+        ->click('@add-payables-monthly')
+        ->type('@item-name-payables-monthly-0', 'Laptop installment')
+        ->type('@item-amount-payables-monthly-0', '2500')
+        ->type('@item-ends-payables-monthly-0', endsInMonths(6))
+        ->click('@sweep-monthly')
+        ->assertSeeIn('@leftover-monthly', '₱0')
+        ->click('@save-plan')
+        ->click('Back to dashboard')
+        ->assertSee('+₱2,500')
+        ->assertSee('when Laptop installment ends');
+});
+
+test('projected cashflow says nothing ends when no payable has a date', function () {
+    $page = visit(route('finance.edit'));
+
+    $page->type('@income-monthly', '40000')
+        ->click('@add-payables-monthly')
+        ->type('@item-name-payables-monthly-0', 'Rent')
+        ->type('@item-amount-payables-monthly-0', '12000')
+        ->click('@save-plan')
+        ->click('Back to dashboard')
+        ->assertSee('Nothing ends in the next 12 months');
+});
+
 test('the dashboard has no accessibility issues', function () {
     $page = visit(route('dashboard'));
 

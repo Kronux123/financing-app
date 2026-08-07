@@ -84,6 +84,79 @@ test('a debt with an end date totals up on the debt page', function () {
         ->assertSee('12 months left');
 });
 
+/** A date `$months` before the start of this month. */
+function debtStartDate(int $months): string
+{
+    return now()->startOfMonth()->subMonths($months)->format('Y-m-d');
+}
+
+test('the start date is asked for only on a debt', function () {
+    $page = visit(route('finance.edit'));
+
+    $page->type('@income-monthly', '40000')
+        ->click('@add-payables-monthly')
+        ->type('@item-amount-payables-monthly-0', '2500')
+        ->assertMissing('@item-started-payables-monthly-0')
+        ->click('@item-is-debt-payables-monthly-0')
+        ->assertPresent('@item-started-payables-monthly-0')
+        ->click('@item-is-debt-payables-monthly-0')
+        ->assertMissing('@item-started-payables-monthly-0');
+});
+
+test('a start date turns what is left into how far through you are', function () {
+    $page = visit(route('finance.edit'));
+
+    // Started 8 months ago, 12 payments left: a 20-month term of ₱2,500.
+    $page->type('@income-monthly', '40000')
+        ->click('@add-payables-monthly')
+        ->type('@item-name-payables-monthly-0', 'Laptop installment')
+        ->type('@item-amount-payables-monthly-0', '2500')
+        ->type('@item-ends-payables-monthly-0', debtEndDate(12))
+        ->click('@item-is-debt-payables-monthly-0')
+        ->type('@item-started-payables-monthly-0', debtStartDate(8))
+        ->assertSeeIn('@item-owed-payables-monthly-0', '₱30,000 left')
+        ->assertSeeIn('@item-owed-payables-monthly-0', '8 of 20 paid')
+        ->click('@save-plan')
+        ->click('@nav-debt')
+        // Borrowed 20 x 2,500, of which 8 x 2,500 is paid and 12 x 2,500 left,
+        // so the totals cannot contradict each other.
+        ->assertSeeIn('@debt-history', '₱50,000 borrowed')
+        ->assertSeeIn('@debt-history', '8 of 20 paid')
+        ->assertSeeIn('@debt-history', '40%')
+        ->assertSeeIn('@debt-total', '₱30,000');
+});
+
+test('the Today button fills the start date in', function () {
+    $page = visit(route('finance.edit'));
+
+    $page->type('@income-monthly', '40000')
+        ->click('@add-payables-monthly')
+        ->type('@item-amount-payables-monthly-0', '2500')
+        ->type('@item-ends-payables-monthly-0', debtEndDate(12))
+        ->click('@item-is-debt-payables-monthly-0')
+        ->click('@item-started-today-payables-monthly-0')
+        ->assertValue('@item-started-payables-monthly-0', now()->format('Y-m-d'))
+        // Starting today is a full term ahead of you, nothing paid yet.
+        ->assertSeeIn('@item-owed-payables-monthly-0', '0 of 12 paid');
+});
+
+test('a debt with no start date shows no progress rather than zero progress', function () {
+    $page = visit(route('finance.edit'));
+
+    $page->type('@income-monthly', '40000')
+        ->click('@add-payables-monthly')
+        ->type('@item-name-payables-monthly-0', 'Laptop installment')
+        ->type('@item-amount-payables-monthly-0', '2500')
+        ->type('@item-ends-payables-monthly-0', debtEndDate(12))
+        ->click('@item-is-debt-payables-monthly-0')
+        ->assertSeeIn('@item-owed-payables-monthly-0', '₱30,000 left')
+        ->assertDontSee('of 12 paid')
+        ->click('@save-plan')
+        ->click('@nav-debt')
+        ->assertMissing('@debt-history')
+        ->assertSeeIn('@debt-total', '₱30,000');
+});
+
 test('a debt without an end date admits it knows no total', function () {
     $page = visit(route('finance.edit'));
 

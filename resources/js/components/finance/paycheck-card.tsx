@@ -9,6 +9,7 @@ import type { BudgetPlan, ExpenseItem, Paycheck } from '@/lib/budget';
 import {
     allocatedFor,
     allocationShare,
+    debtHistoryFor,
     debtProgressFor,
     enteredTotalFor,
     groupTotal,
@@ -83,7 +84,8 @@ const allocationTierFor = (
 
 /**
  * What a debt still owes: the payment times the payments left. Derived, so the
- * row reports it rather than asking for it.
+ * row reports it rather than asking for it. A start date adds what was borrowed
+ * and how far through you are.
  */
 const debtNote = (item: ExpenseItem, today: Date): string => {
     const { owed, months, isOpenEnded } = debtProgressFor(item, today);
@@ -96,7 +98,23 @@ const debtNote = (item: ExpenseItem, today: Date): string => {
         return 'ended';
     }
 
-    return `${formatPeso(owed)} left · ${months} ${months === 1 ? 'month' : 'months'}`;
+    const left = `${formatPeso(owed)} left · ${months} ${months === 1 ? 'month' : 'months'}`;
+    const history = debtHistoryFor(item, today);
+
+    if (!history) {
+        return left;
+    }
+
+    return `${left} · ${history.monthsPaid} of ${history.totalMonths} paid`;
+};
+
+/** Today as `YYYY-MM-DD` in local time — `toISOString` would shift the day. */
+const todayValue = (today: Date): string => {
+    return [
+        today.getFullYear(),
+        String(today.getMonth() + 1).padStart(2, '0'),
+        String(today.getDate()).padStart(2, '0'),
+    ].join('-');
 };
 
 const paydayDescription = (paycheck: Paycheck): string => {
@@ -503,18 +521,73 @@ export function PaycheckCard({
                                         </div>
 
                                         {/*
-                                         * Ticking Debt asks for nothing extra —
-                                         * the amount and the end date above are
-                                         * the whole of it. This only reports back
-                                         * what they add up to.
+                                         * A debt gets one more line. The start
+                                         * date is optional and only useful here —
+                                         * it is what turns "what is left" into
+                                         * "how far through you are" — so it stays
+                                         * off every other payable's row.
                                          */}
                                         {item.isDebt && (
-                                            <p
-                                                data-test={`item-owed-${group.id}-${paycheck.id}-${index}`}
-                                                className="text-xs text-muted-foreground tabular-nums"
-                                            >
-                                                {debtNote(item, today)}
-                                            </p>
+                                            <>
+                                                <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+                                                    <span
+                                                        aria-hidden
+                                                        className="text-xs text-muted-foreground"
+                                                    >
+                                                        Started
+                                                    </span>
+                                                    <Input
+                                                        type="date"
+                                                        aria-label={`${item.name || 'Expense'} started on, optional`}
+                                                        data-test={`item-started-${group.id}-${paycheck.id}-${index}`}
+                                                        value={
+                                                            item.startedOn ?? ''
+                                                        }
+                                                        onChange={(event) =>
+                                                            onItemChange(
+                                                                group.id,
+                                                                item.id,
+                                                                {
+                                                                    startedOn:
+                                                                        event
+                                                                            .target
+                                                                            .value ||
+                                                                        undefined,
+                                                                },
+                                                            )
+                                                        }
+                                                        className="h-8 w-36 text-xs [color-scheme:light] dark:[color-scheme:dark]"
+                                                    />
+                                                    <Button
+                                                        type="button"
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        data-test={`item-started-today-${group.id}-${paycheck.id}-${index}`}
+                                                        className="h-7 px-2 text-xs text-foreground/70"
+                                                        onClick={() =>
+                                                            onItemChange(
+                                                                group.id,
+                                                                item.id,
+                                                                {
+                                                                    startedOn:
+                                                                        todayValue(
+                                                                            today,
+                                                                        ),
+                                                                },
+                                                            )
+                                                        }
+                                                    >
+                                                        Today
+                                                    </Button>
+                                                </div>
+
+                                                <p
+                                                    data-test={`item-owed-${group.id}-${paycheck.id}-${index}`}
+                                                    className="text-xs text-muted-foreground tabular-nums"
+                                                >
+                                                    {debtNote(item, today)}
+                                                </p>
+                                            </>
                                         )}
                                     </div>
                                 ))}

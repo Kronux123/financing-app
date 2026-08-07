@@ -16,8 +16,9 @@ import { SavingsChart } from '@/components/dashboard/savings-chart';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useStoredBudgetPlan } from '@/hooks/use-budget-plan';
-import type { BudgetPlan } from '@/lib/budget';
+import type { BudgetPlan, FreeingUp } from '@/lib/budget';
 import {
+    freeingUpWithin,
     groupTotal,
     isPlanPopulated,
     planTotals,
@@ -38,6 +39,10 @@ import { edit as financeRoute } from '@/routes/finance';
  */
 const sampleTotalSaved = 82_400;
 const sampleMonthlyGoal = 7_200;
+const sampleFreesUp = 2_500;
+
+/** How far ahead the cashflow tile looks for payables that finish. */
+const cashflowWindowMonths = 12;
 
 const sampleSupportingStats = [
     { label: 'Average monthly save', value: 6_880 },
@@ -88,7 +93,9 @@ type FundFigures = {
 type DerivedFigures = {
     monthlyGoal: number;
     monthlyExpenses: number;
+    /** Monthly amount coming back as payables finish, and what to say about it. */
     projectedCashflow: number;
+    cashflowNote: string;
     /** Negative, like the other outgoing figures. Zero once nothing is owed. */
     outstandingDebt: number;
     categories: { name: string; amount: number; color: string }[];
@@ -110,6 +117,36 @@ const withColors = (
 };
 
 /**
+ * "Jul 2027" from a stored `YYYY-MM-DD`. Parsed rather than read off the clock,
+ * so the label is whatever the user typed.
+ */
+const monthLabel = (endsOn: string): string => {
+    return new Date(`${endsOn}T00:00:00`).toLocaleDateString('en-US', {
+        month: 'short',
+        year: 'numeric',
+    });
+};
+
+/**
+ * Names what is about to free up. One payable gets named outright, because that
+ * is the useful version — "the laptop finishes in July" is actionable in a way
+ * that a bare total is not.
+ */
+const cashflowNoteFor = ({ ending }: FreeingUp): string => {
+    if (ending.length === 0) {
+        return `Nothing ends in the next ${cashflowWindowMonths} months`;
+    }
+
+    const last = ending[ending.length - 1];
+
+    if (ending.length === 1) {
+        return `when ${last.name || 'a payable'} ends in ${monthLabel(last.endsOn ?? '')}`;
+    }
+
+    return `across ${ending.length} payables by ${monthLabel(last.endsOn ?? '')}`;
+};
+
+/**
  * Reads the saved budget plan where it can, and falls back to the sample
  * figures so a first visit never renders an empty dashboard.
  */
@@ -121,7 +158,8 @@ const deriveFigures = (
         return {
             monthlyGoal: sampleMonthlyGoal,
             monthlyExpenses: -4_125,
-            projectedCashflow: 1_320,
+            projectedCashflow: sampleFreesUp,
+            cashflowNote: 'when an installment ends',
             outstandingDebt: sampleOutstandingDebt,
             categories: withColors(sampleCategories),
             totalSaved: sampleTotalSaved,
@@ -131,17 +169,19 @@ const deriveFigures = (
         };
     }
 
-    const { allocated, unallocated } = planTotals(plan);
+    const { allocated } = planTotals(plan);
     const savingsGroup = plan.groups.find(
         (group) => group.id === savingsGroupId,
     );
     const plannedSavings = savingsGroup ? groupTotal(savingsGroup) : 0;
     const split = savingsSplit(plan);
+    const freeingUp = freeingUpWithin(plan, cashflowWindowMonths, today);
 
     return {
         monthlyGoal: plannedSavings > 0 ? plannedSavings : sampleMonthlyGoal,
         monthlyExpenses: -(allocated - plannedSavings),
-        projectedCashflow: unallocated,
+        projectedCashflow: freeingUp.amount,
+        cashflowNote: cashflowNoteFor(freeingUp),
         outstandingDebt: -totalOwed(plan, today),
         categories: withColors(
             plan.groups
@@ -194,6 +234,7 @@ export default function Dashboard() {
         monthlyGoal,
         monthlyExpenses,
         projectedCashflow,
+        cashflowNote,
         outstandingDebt,
         categories,
         totalSaved,
@@ -222,7 +263,7 @@ export default function Dashboard() {
         {
             label: 'Projected cashflow',
             value: projectedCashflow,
-            note: hasPlan ? 'Unallocated this month' : 'Next 30 days',
+            note: cashflowNote,
             icon: TrendingUp,
         },
     ];

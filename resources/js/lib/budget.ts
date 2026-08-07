@@ -42,6 +42,13 @@ export type ExpenseItem = {
      * debt is. Nothing extra is asked for when this is set.
      */
     isDebt?: boolean;
+    /**
+     * When a debt's payments began, as `YYYY-MM-DD`. Optional, and only asked for
+     * on a debt — it buys the two figures the end date alone cannot give: what was
+     * borrowed to begin with, and how far through you are. Absent is a valid state
+     * for a debt whose start was never recorded.
+     */
+    startedOn?: string;
 };
 
 export type ExpenseGroup = {
@@ -468,18 +475,116 @@ export const savingsSplit = (plan: BudgetPlan): SavingsSplit => {
  * means. Reading a clock to *show* a projection is fine; note that the TODO on
  * `endsOn` is about never *deleting* a payable on the strength of one.
  */
-export const monthsRemaining = (endsOn: string, today: Date): number => {
-    const end = new Date(`${endsOn}T00:00:00`);
+const parseDate = (value: string): Date | null => {
+    const parsed = new Date(`${value}T00:00:00`);
 
-    if (Number.isNaN(end.getTime())) {
-        return 0;
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+};
+
+/** Calendar months from one date to another, ignoring the day of the month. */
+const wholeMonthsBetween = (from: Date, to: Date): number => {
+    return (
+        (to.getFullYear() - from.getFullYear()) * 12 +
+        (to.getMonth() - from.getMonth())
+    );
+};
+
+export const monthsRemaining = (endsOn: string, today: Date): number => {
+    const end = parseDate(endsOn);
+
+    return end ? Math.max(0, wholeMonthsBetween(today, end) + 1) : 0;
+};
+
+export type DebtHistory = {
+    /** Payments across the whole term, counting the first and last months. */
+    totalMonths: number;
+    monthsPaid: number;
+    /** What the debt was to begin with. */
+    original: number;
+    paid: number;
+    /** 0–1, capped, for a progress bar. */
+    paidShare: number;
+};
+
+/**
+ * How far through a debt you are, for one that records when it started.
+ *
+ * The arithmetic is pinned to `monthsRemaining` so the page cannot contradict
+ * itself: months paid plus months remaining is the whole term, which makes
+ * `original - paid` exactly the amount the debt page already reports as owed.
+ *
+ * `null` when either date is missing or the term makes no sense, rather than a
+ * zeroed shape that would read as "no progress yet".
+ */
+export const debtHistoryFor = (
+    item: ExpenseItem,
+    today: Date,
+): DebtHistory | null => {
+    if (!item.startedOn || !item.endsOn) {
+        return null;
     }
 
-    const wholeMonths =
-        (end.getFullYear() - today.getFullYear()) * 12 +
-        (end.getMonth() - today.getMonth());
+    const start = parseDate(item.startedOn);
+    const end = parseDate(item.endsOn);
 
-    return Math.max(0, wholeMonths + 1);
+    if (!start || !end) {
+        return null;
+    }
+
+    const totalMonths = wholeMonthsBetween(start, end) + 1;
+
+    if (totalMonths <= 0) {
+        return null;
+    }
+
+    const monthsPaid = Math.min(
+        totalMonths,
+        Math.max(0, wholeMonthsBetween(start, today)),
+    );
+
+    return {
+        totalMonths,
+        monthsPaid,
+        original: item.amount * totalMonths,
+        paid: item.amount * monthsPaid,
+        paidShare: monthsPaid / totalMonths,
+    };
+};
+
+export type FreeingUp = {
+    /** Monthly amount that stops being spent inside the window. */
+    amount: number;
+    /** The payables ending, soonest first. */
+    ending: ExpenseItem[];
+};
+
+/**
+ * What the budget is about to get back: the payables that finish inside the next
+ * `monthsAhead` months, and what they add up to a month.
+ *
+ * A date already past is left out. That payable has finished but is still in the
+ * plan — retiring it is manual for now (see the note on `endsOn`) — and calling
+ * it "about to free up" would be the wrong tense.
+ */
+export const freeingUpWithin = (
+    plan: BudgetPlan,
+    monthsAhead: number,
+    today: Date,
+): FreeingUp => {
+    const ending = plan.groups
+        .flatMap((group) => group.items)
+        .flatMap((item) =>
+            item.endsOn
+                ? [{ item, months: monthsRemaining(item.endsOn, today) }]
+                : [],
+        )
+        .filter((entry) => entry.months > 0 && entry.months <= monthsAhead)
+        .sort((a, b) => a.months - b.months);
+
+    return {
+        amount: ending.reduce((sum, entry) => sum + entry.item.amount, 0),
+        ending: ending.map((entry) => entry.item),
+    };
 };
 
 export type DebtProgress = {
@@ -627,7 +732,8 @@ const isExpenseItem = (value: unknown): value is ExpenseItem => {
         typeof item.amount === 'number' &&
         typeof item.paycheckId === 'string' &&
         (item.endsOn === undefined || typeof item.endsOn === 'string') &&
-        (item.isDebt === undefined || typeof item.isDebt === 'boolean')
+        (item.isDebt === undefined || typeof item.isDebt === 'boolean') &&
+        (item.startedOn === undefined || typeof item.startedOn === 'string')
     );
 };
 

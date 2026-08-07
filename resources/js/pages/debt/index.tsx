@@ -13,6 +13,7 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { useStoredBudgetPlan } from '@/hooks/use-budget-plan';
 import type { BudgetPlan, DebtProgress } from '@/lib/budget';
 import {
+    debtHistoryFor,
     debtProgress,
     monthsToDebtFree,
     totalDebtPayment,
@@ -61,6 +62,22 @@ const rowNote = (progress: DebtProgress): string => {
     }
 
     return `${monthsLabel(progress.months)} left · ends ${progress.item.endsOn}`;
+};
+
+/**
+ * The second line, when the debt records when it started: what it was to begin
+ * with and how far through it you are. Only a start date can give either.
+ */
+const historyNote = (progress: DebtProgress, today: Date): string | null => {
+    const history = debtHistoryFor(progress.item, today);
+
+    if (!history) {
+        return null;
+    }
+
+    const percent = Math.round(history.paidShare * 100);
+
+    return `${formatPeso(history.original)} borrowed · ${history.monthsPaid} of ${history.totalMonths} paid · ${percent}%`;
 };
 
 const trackerNote = (
@@ -226,6 +243,14 @@ export default function Debt() {
                                             <span className="block text-xs font-normal text-muted-foreground tabular-nums">
                                                 {rowNote(entry)}
                                             </span>
+                                            {historyNote(entry, today) && (
+                                                <span
+                                                    data-test="debt-history"
+                                                    className="block text-xs font-normal text-muted-foreground tabular-nums"
+                                                >
+                                                    {historyNote(entry, today)}
+                                                </span>
+                                            )}
                                         </dt>
                                         <dd className="shrink-0 text-right">
                                             <span className="text-sm font-semibold tabular-nums">
