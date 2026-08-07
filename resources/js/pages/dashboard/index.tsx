@@ -23,6 +23,7 @@ import {
     planTotals,
     savingsGroupId,
     savingsSplit,
+    totalOwed,
     totalSaved as planTotalSaved,
 } from '@/lib/budget';
 import { formatPeso, formatSigned } from '@/lib/currency';
@@ -51,7 +52,7 @@ const monthlySavings = [
     { month: 'Mar', amount: 6_120 },
 ];
 
-const outstandingDebt = -16_780;
+const sampleOutstandingDebt = -16_780;
 
 const recentActivity = [
     { title: 'Mortgage payment', amount: -1_250, when: 'Today' },
@@ -88,6 +89,8 @@ type DerivedFigures = {
     monthlyGoal: number;
     monthlyExpenses: number;
     projectedCashflow: number;
+    /** Negative, like the other outgoing figures. Zero once nothing is owed. */
+    outstandingDebt: number;
     categories: { name: string; amount: number; color: string }[];
     /** Both balances together once a plan exists, sample data before that. */
     totalSaved: number;
@@ -110,12 +113,16 @@ const withColors = (
  * Reads the saved budget plan where it can, and falls back to the sample
  * figures so a first visit never renders an empty dashboard.
  */
-const deriveFigures = (plan: BudgetPlan | null): DerivedFigures => {
+const deriveFigures = (
+    plan: BudgetPlan | null,
+    today: Date,
+): DerivedFigures => {
     if (!plan || !isPlanPopulated(plan)) {
         return {
             monthlyGoal: sampleMonthlyGoal,
             monthlyExpenses: -4_125,
             projectedCashflow: 1_320,
+            outstandingDebt: sampleOutstandingDebt,
             categories: withColors(sampleCategories),
             totalSaved: sampleTotalSaved,
             savedPerMonth: sampleMonthlyGoal,
@@ -135,6 +142,7 @@ const deriveFigures = (plan: BudgetPlan | null): DerivedFigures => {
         monthlyGoal: plannedSavings > 0 ? plannedSavings : sampleMonthlyGoal,
         monthlyExpenses: -(allocated - plannedSavings),
         projectedCashflow: unallocated,
+        outstandingDebt: -totalOwed(plan, today),
         categories: withColors(
             plan.groups
                 .map((group) => ({
@@ -186,12 +194,13 @@ export default function Dashboard() {
         monthlyGoal,
         monthlyExpenses,
         projectedCashflow,
+        outstandingDebt,
         categories,
         totalSaved,
         savedPerMonth,
         savingsBreakdown,
         fund,
-    } = deriveFigures(plan);
+    } = deriveFigures(plan, new Date());
     const categoryTotal = categories.reduce(
         (sum, item) => sum + item.amount,
         0,
@@ -207,7 +216,7 @@ export default function Dashboard() {
         {
             label: 'Outstanding debt',
             value: outstandingDebt,
-            note: 'Remaining balance',
+            note: outstandingDebt === 0 ? 'Nothing owed' : 'Remaining balance',
             icon: Landmark,
         },
         {

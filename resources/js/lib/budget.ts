@@ -36,6 +36,12 @@ export type ExpenseItem = {
      * payable is manual.
      */
     endsOn?: string;
+    /**
+     * Marks this payable as paying off a debt. Purely a category: the row already
+     * holds the name, the monthly payment and the end date, which is everything a
+     * debt is. Nothing extra is asked for when this is set.
+     */
+    isDebt?: boolean;
 };
 
 export type ExpenseGroup = {
@@ -68,7 +74,7 @@ export type SavingsPot = {
 
 export type BudgetPlan = {
     /** Bumped when the shape changes, so stored plans can be migrated. */
-    version: 4;
+    version: 6;
     cadence: PayCadence;
     paychecks: Paycheck[];
     groups: ExpenseGroup[];
@@ -82,7 +88,7 @@ export type PlanTotals = {
     unallocated: number;
 };
 
-export const PLAN_VERSION = 4;
+export const PLAN_VERSION = 6;
 
 export const monthlyPaycheckId = 'monthly';
 export const midMonthPaycheckId = 'mid-month';
@@ -454,6 +460,111 @@ export const savingsSplit = (plan: BudgetPlan): SavingsSplit => {
 };
 
 /**
+ * Payments still to make on a payable that ends, counting the month it ends in.
+ * A payable finishing this month still has this month's payment left.
+ *
+ * `today` is passed in rather than read here, both to keep this file free of
+ * ambient state and because the caller should be the one deciding what "now"
+ * means. Reading a clock to *show* a projection is fine; note that the TODO on
+ * `endsOn` is about never *deleting* a payable on the strength of one.
+ */
+export const monthsRemaining = (endsOn: string, today: Date): number => {
+    const end = new Date(`${endsOn}T00:00:00`);
+
+    if (Number.isNaN(end.getTime())) {
+        return 0;
+    }
+
+    const wholeMonths =
+        (end.getFullYear() - today.getFullYear()) * 12 +
+        (end.getMonth() - today.getMonth());
+
+    return Math.max(0, wholeMonths + 1);
+};
+
+export type DebtProgress = {
+    item: ExpenseItem;
+    /** This payable's monthly figure. */
+    payment: number;
+    /** Payments left, or `Infinity` when there is no end date to count to. */
+    months: number;
+    /** Still owed: the payment times the payments remaining. */
+    owed: number;
+    /** True when no end date says when this finishes, so nothing can be known. */
+    isOpenEnded: boolean;
+};
+
+/**
+ * What one payable marked as debt still owes — its payment times the payments
+ * left. Nothing is asked of the user beyond the row itself.
+ *
+ * Without an end date there is nothing to count to, and this says so rather than
+ * reporting zero. Adding the date is the fix, and it is a field the row already
+ * has.
+ */
+export const debtProgressFor = (
+    item: ExpenseItem,
+    today: Date,
+): DebtProgress => {
+    if (!item.endsOn) {
+        return {
+            item,
+            payment: item.amount,
+            months: Infinity,
+            owed: 0,
+            isOpenEnded: true,
+        };
+    }
+
+    const months = monthsRemaining(item.endsOn, today);
+
+    return {
+        item,
+        payment: item.amount,
+        months,
+        owed: item.amount * months,
+        isOpenEnded: false,
+    };
+};
+
+/** Every payable marked as debt, in the order the plan holds them. */
+export const debtItems = (plan: BudgetPlan): ExpenseItem[] => {
+    return plan.groups.flatMap((group) =>
+        group.items.filter((item) => item.isDebt === true),
+    );
+};
+
+export const debtProgress = (plan: BudgetPlan, today: Date): DebtProgress[] => {
+    return debtItems(plan).map((item) => debtProgressFor(item, today));
+};
+
+/** Everything still owed across every debt. */
+export const totalOwed = (plan: BudgetPlan, today: Date): number => {
+    return debtProgress(plan, today).reduce(
+        (sum, progress) => sum + progress.owed,
+        0,
+    );
+};
+
+/** Going out on debt each month, whatever is known about the balances. */
+export const totalDebtPayment = (plan: BudgetPlan): number => {
+    return debtItems(plan).reduce((sum, item) => sum + item.amount, 0);
+};
+
+/**
+ * When the last debt clears — the longest single payoff, not the total divided
+ * by the total payment. Nothing here rolls a cleared debt's payment onto the
+ * next one, so the slowest debt decides when you are done.
+ *
+ * `Infinity` when any debt has no end date and no balance to work one out from.
+ */
+export const monthsToDebtFree = (plan: BudgetPlan, today: Date): number => {
+    return debtProgress(plan, today)
+        .filter((progress) => progress.owed > 0 || progress.isOpenEnded)
+        .reduce((longest, progress) => Math.max(longest, progress.months), 0);
+};
+
+/**
  * Moves a plan onto a new cadence without losing anything the user typed.
  *
  * Going monthly to semi-monthly halves the income across the two dates and
@@ -515,7 +626,8 @@ const isExpenseItem = (value: unknown): value is ExpenseItem => {
         typeof item.name === 'string' &&
         typeof item.amount === 'number' &&
         typeof item.paycheckId === 'string' &&
-        (item.endsOn === undefined || typeof item.endsOn === 'string')
+        (item.endsOn === undefined || typeof item.endsOn === 'string') &&
+        (item.isDebt === undefined || typeof item.isDebt === 'boolean')
     );
 };
 
@@ -582,6 +694,8 @@ type StoredPlan = Omit<
     version: number;
     emergencyFund?: unknown;
     savingsPot?: unknown;
+    /** v5 only, where debts were their own records. Dropped on migration. */
+    debts?: unknown;
 };
 
 /**
@@ -626,6 +740,16 @@ const v1GroupMoves: Record<string, string> = {
     savings: savingsGroupId,
 };
 
+/**
+ * A v5 payable pointed at a debt record by id. The flag says the same thing
+ * without the second record, so the link becomes the flag and the id goes.
+ */
+const flaggedFromV5Debt = (item: ExpenseItem): ExpenseItem => {
+    const { debtId, ...carried } = item as ExpenseItem & { debtId?: string };
+
+    return debtId === undefined ? carried : { ...carried, isDebt: true };
+};
+
 /** Folds a v1 plan's four groups into the three that replaced them. */
 const regroupedFromV1 = (previous: StoredPlan): ExpenseGroup[] => {
     return defaultGroupNames.map((group) => ({
@@ -644,16 +768,18 @@ const regroupedFromV1 = (previous: StoredPlan): ExpenseGroup[] => {
  *
  * v1 had Needs, Utilities, Wants and Savings; the first two became Payables and
  * Wants became Allowance, so nothing entered is lost. v2 predates the emergency
- * fund and v3 the savings pot, so each gets a fresh one. A current plan carrying
- * a damaged balance keeps its expenses and has that balance reset, rather than
- * being thrown away whole.
+ * fund and v3 the savings pot, so each gets a fresh one. v5 kept debts as their
+ * own records, which v6 folds back into the payables that pay them; the records
+ * themselves are dropped, since a debt with no payable was never funded anyway.
+ * A current plan carrying a damaged balance keeps its expenses and has that
+ * balance reset, rather than being thrown away whole.
  */
 export const migratePlan = (value: unknown): BudgetPlan | null => {
     if (isBudgetPlan(value)) {
         return value;
     }
 
-    const storedVersion = [1, 2, 3, PLAN_VERSION].find((version) =>
+    const storedVersion = [1, 2, 3, 4, 5, PLAN_VERSION].find((version) =>
         hasPlanShape(value, version),
     );
 
@@ -663,11 +789,19 @@ export const migratePlan = (value: unknown): BudgetPlan | null => {
 
     const previous = value as StoredPlan;
 
+    // Built field by field rather than spread, so a retired key like v5's
+    // `debts` cannot ride along into the migrated plan.
     return {
-        ...previous,
         version: PLAN_VERSION,
-        groups:
-            storedVersion === 1 ? regroupedFromV1(previous) : previous.groups,
+        cadence: previous.cadence,
+        paychecks: previous.paychecks,
+        groups: (storedVersion === 1
+            ? regroupedFromV1(previous)
+            : previous.groups
+        ).map((group) => ({
+            ...group,
+            items: group.items.map(flaggedFromV5Debt),
+        })),
         emergencyFund: isEmergencyFund(previous.emergencyFund)
             ? previous.emergencyFund
             : createEmergencyFund(),
