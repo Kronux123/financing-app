@@ -50,6 +50,23 @@ test('authenticated users can visit the debt page', function () {
     );
 });
 
+test('guests are redirected away from the payouts page', function () {
+    $response = $this->get(route('payouts.index'));
+    $response->assertRedirect(route('login'));
+});
+
+test('authenticated users can visit the payouts page', function () {
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    $response = $this->get(route('payouts.index'));
+
+    $response->assertOk();
+    $response->assertInertia(
+        fn (AssertableInertia $page) => $page->component('payouts/index')
+    );
+});
+
 test('guests are redirected away from the savings calendar', function () {
     $response = $this->get(route('dashboard.months'));
     $response->assertRedirect(route('login'));

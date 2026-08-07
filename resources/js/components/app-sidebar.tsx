@@ -1,5 +1,11 @@
 import { Link } from '@inertiajs/react';
-import { Activity, DollarSign, Landmark, LayoutGrid } from 'lucide-react';
+import {
+    Activity,
+    DollarSign,
+    Landmark,
+    LayoutGrid,
+    Wallet,
+} from 'lucide-react';
 import AppLogo from '@/components/app-logo';
 import { NavMain } from '@/components/nav-main';
 import { NavUser } from '@/components/nav-user';
@@ -16,6 +22,7 @@ import { dashboard } from '@/routes';
 import dashboardRoutes from '@/routes/dashboard';
 import { index as debt } from '@/routes/debt';
 import { edit as finance } from '@/routes/finance';
+import { index as payouts } from '@/routes/payouts';
 import type { NavItem } from '@/types';
 
 const mainNavItems: NavItem[] = [
@@ -38,6 +45,11 @@ const mainNavItems: NavItem[] = [
         title: 'Debt',
         href: debt(),
         icon: Landmark,
+    },
+    {
+        title: 'Payouts',
+        href: payouts(),
+        icon: Wallet,
     },
 ];
 

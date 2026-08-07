@@ -11,6 +11,8 @@ type AmountInputProps = {
     label?: string;
     placeholder?: string;
     className?: string;
+    /** Locks the field without hiding the figure — a finalized record reads. */
+    disabled?: boolean;
     'data-test'?: string;
 };
 
@@ -42,6 +44,7 @@ export function AmountInput({
     label,
     placeholder = '0',
     className,
+    disabled,
     'data-test': dataTest,
 }: AmountInputProps) {
     const [draft, setDraft] = useState(value ? String(value) : '');
@@ -77,6 +80,7 @@ export function AmountInput({
                 inputMode="decimal"
                 placeholder={placeholder}
                 value={draft}
+                disabled={disabled}
                 onChange={(event) => handleChange(event.target.value)}
                 className="pl-7 text-right tabular-nums"
             />

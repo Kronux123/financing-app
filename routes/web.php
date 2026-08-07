@@ -10,6 +10,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::inertia('dashboard/activities', 'activities/index')->name('dashboard.activities');
     Route::inertia('finance', 'finance/index')->name('finance.edit');
     Route::inertia('debt', 'debt/index')->name('debt.index');
+    Route::inertia('payouts', 'payouts/index')->name('payouts.index');
 });
 
 require __DIR__.'/settings.php';
