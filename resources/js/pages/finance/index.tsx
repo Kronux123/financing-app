@@ -1,5 +1,4 @@
 import { Head, Link } from '@inertiajs/react';
-import { useState } from 'react';
 import { toast } from 'sonner';
 import { PaycheckCard } from '@/components/finance/paycheck-card';
 import { PlanSummary } from '@/components/finance/plan-summary';
@@ -7,61 +6,19 @@ import { SavingsCard } from '@/components/finance/savings-card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
-import { saveBudgetPlan, useStoredBudgetPlan } from '@/hooks/use-budget-plan';
-import type {
-    BudgetPlan,
-    EmergencyFund,
-    ExpenseItem,
-    PayCadence,
-} from '@/lib/budget';
+import { useBudgetPlanDraft } from '@/hooks/use-budget-plan';
+import type { EmergencyFund, ExpenseItem, PayCadence } from '@/lib/budget';
 import {
     cadenceOptions,
     createId,
-    createPlan,
     reassignTo,
     withGroupAmount,
-    withSweptRemainders,
 } from '@/lib/budget';
 import { dashboard } from '@/routes';
 import { edit as financeRoute } from '@/routes/finance';
 
-/**
- * The plan being edited alongside the one last written to storage. Holding both
- * in a single state value keeps them in step, so an untouched page can never
- * report itself as dirty.
- */
-type Draft = {
-    plan: BudgetPlan;
-    saved: BudgetPlan;
-    /** The stored plan this draft was seeded from, to detect late hydration. */
-    source: BudgetPlan | null;
-};
-
 export default function Finance() {
-    const storedPlan = useStoredBudgetPlan();
-    const [draft, setDraft] = useState<Draft>(() => {
-        const initial = storedPlan ?? createPlan();
-
-        return { plan: initial, saved: initial, source: storedPlan };
-    });
-
-    // Adopt a plan that arrives after the first render, but never over edits.
-    if (draft.source !== storedPlan && draft.plan === draft.saved) {
-        const next = storedPlan ?? createPlan();
-
-        setDraft({ plan: next, saved: next, source: storedPlan });
-    }
-
-    const plan = draft.plan;
-    const isDirty = draft.plan !== draft.saved;
-
-    /**
-     * Every edit passes through the sweep, so a paycheck saving its remainder
-     * keeps that line correct no matter which field moved it.
-     */
-    const updatePlan = (next: BudgetPlan) => {
-        setDraft({ ...draft, plan: withSweptRemainders(next) });
-    };
+    const { plan, isDirty, update: updatePlan, save } = useBudgetPlanDraft();
 
     const handleCadenceChange = (value: string) => {
         if (value !== 'monthly' && value !== 'semi-monthly') {
@@ -168,8 +125,7 @@ export default function Finance() {
     };
 
     const handleSave = () => {
-        saveBudgetPlan(plan);
-        setDraft({ plan, saved: plan, source: plan });
+        save();
         toast.success('Budget plan saved.');
     };
 

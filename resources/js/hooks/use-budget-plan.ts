@@ -1,6 +1,6 @@
-import { useSyncExternalStore } from 'react';
+import { useState, useSyncExternalStore } from 'react';
 import type { BudgetPlan } from '@/lib/budget';
-import { migratePlan } from '@/lib/budget';
+import { createPlan, migratePlan, withSweptRemainders } from '@/lib/budget';
 
 export const budgetPlanStorageKey = 'budgetPlan';
 
@@ -75,4 +75,63 @@ export function useStoredBudgetPlan(): BudgetPlan | null {
         () => currentPlan,
         () => null,
     );
+}
+
+/**
+ * The plan being edited alongside the one last written to storage. Holding both
+ * in a single state value keeps them in step, so an untouched page can never
+ * report itself as dirty.
+ */
+type Draft = {
+    plan: BudgetPlan;
+    saved: BudgetPlan;
+    /** The stored plan this draft was seeded from, to detect late hydration. */
+    source: BudgetPlan | null;
+};
+
+export type PlanDraft = {
+    plan: BudgetPlan;
+    isDirty: boolean;
+    update: (next: BudgetPlan) => void;
+    save: () => void;
+};
+
+/**
+ * An editable copy of the stored plan, shared by every page that edits one — the
+ * budget and the debt list are two views of the same saved plan, and the late
+ * hydration dance below is too easy to get subtly wrong twice.
+ */
+export function useBudgetPlanDraft(): PlanDraft {
+    const storedPlan = useStoredBudgetPlan();
+    const [draft, setDraft] = useState<Draft>(() => {
+        const initial = storedPlan ?? createPlan();
+
+        return { plan: initial, saved: initial, source: storedPlan };
+    });
+
+    // Adopt a plan that arrives after the first render, but never over edits.
+    if (draft.source !== storedPlan && draft.plan === draft.saved) {
+        const next = storedPlan ?? createPlan();
+
+        setDraft({ plan: next, saved: next, source: storedPlan });
+    }
+
+    return {
+        plan: draft.plan,
+        isDirty: draft.plan !== draft.saved,
+        /**
+         * Every edit passes through the sweep, so a paycheck saving its
+         * remainder keeps that line correct no matter which field moved it.
+         */
+        update: (next) =>
+            setDraft({ ...draft, plan: withSweptRemainders(next) }),
+        save: () => {
+            saveBudgetPlan(draft.plan);
+            setDraft({
+                plan: draft.plan,
+                saved: draft.plan,
+                source: draft.plan,
+            });
+        },
+    };
 }
