@@ -16,6 +16,23 @@ test('authenticated users can visit the dashboard', function () {
     $response->assertOk();
 });
 
+test('guests are redirected away from the activity log', function () {
+    $response = $this->get(route('dashboard.activities'));
+    $response->assertRedirect(route('login'));
+});
+
+test('authenticated users can visit the activity log', function () {
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    $response = $this->get(route('dashboard.activities'));
+
+    $response->assertOk();
+    $response->assertInertia(
+        fn (AssertableInertia $page) => $page->component('activities/index')
+    );
+});
+
 test('guests are redirected away from the savings calendar', function () {
     $response = $this->get(route('dashboard.months'));
     $response->assertRedirect(route('login'));
