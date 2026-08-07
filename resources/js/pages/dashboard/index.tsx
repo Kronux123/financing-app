@@ -1,4 +1,17 @@
 import { Head, Link } from '@inertiajs/react';
+import {
+    Activity,
+    ArrowDownRight,
+    ArrowUpRight,
+    ChartColumn,
+    ChartPie,
+    CreditCard,
+    Info,
+    Landmark,
+    PiggyBank,
+    ShieldCheck,
+    TrendingUp,
+} from 'lucide-react';
 import { SavingsChart } from '@/components/dashboard/savings-chart';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,6 +23,7 @@ import {
     planTotals,
     savingsGroupId,
     savingsSplit,
+    totalSaved as planTotalSaved,
 } from '@/lib/budget';
 import { formatPeso, formatSigned } from '@/lib/currency';
 import { dashboard } from '@/routes';
@@ -21,7 +35,6 @@ import { edit as financeRoute } from '@/routes/finance';
  * rather than a forward-looking plan. These stay sample data until the backend
  * release gives them somewhere real to come from.
  */
-const sampleSavingsGoal = 108_000;
 const sampleTotalSaved = 82_400;
 const sampleMonthlyGoal = 7_200;
 
@@ -63,15 +76,25 @@ const categoryColors = [
     'bg-teal-500',
 ];
 
+type FundFigures = {
+    balance: number;
+    target: number;
+    gap: number;
+    monthsToFill: number | null;
+    percent: number;
+};
+
 type DerivedFigures = {
     monthlyGoal: number;
     monthlyExpenses: number;
     projectedCashflow: number;
     categories: { name: string; amount: number; color: string }[];
-    /** The emergency fund balance once a plan exists, sample data before that. */
+    /** Both balances together once a plan exists, sample data before that. */
     totalSaved: number;
-    savingsGoal: number;
-    supportingStats: { label: string; value: number }[];
+    savedPerMonth: number;
+    savingsBreakdown: { label: string; value: number }[];
+    /** Null without a plan — there is nothing to size a fund against. */
+    fund: FundFigures | null;
 };
 
 const withColors = (
@@ -95,8 +118,9 @@ const deriveFigures = (plan: BudgetPlan | null): DerivedFigures => {
             projectedCashflow: 1_320,
             categories: withColors(sampleCategories),
             totalSaved: sampleTotalSaved,
-            savingsGoal: sampleSavingsGoal,
-            supportingStats: sampleSupportingStats,
+            savedPerMonth: sampleMonthlyGoal,
+            savingsBreakdown: sampleSupportingStats,
+            fund: null,
         };
     }
 
@@ -119,13 +143,40 @@ const deriveFigures = (plan: BudgetPlan | null): DerivedFigures => {
                 }))
                 .filter((group) => group.amount > 0),
         ),
-        totalSaved: split.balance,
-        savingsGoal: split.target,
-        supportingStats: [
-            { label: 'Going to savings', value: split.saved },
-            { label: 'Still to go', value: split.gap },
+        totalSaved: planTotalSaved(plan),
+        savedPerMonth: split.saved,
+        savingsBreakdown: [
+            { label: 'Emergency fund', value: plan.emergencyFund.balance },
+            { label: 'Savings pot', value: plan.savingsPot.balance },
         ],
+        fund: {
+            balance: split.balance,
+            target: split.target,
+            gap: split.gap,
+            monthsToFill: split.monthsToFill,
+            percent:
+                split.target > 0
+                    ? Math.round(
+                          Math.min(split.balance / split.target, 1) * 100,
+                      )
+                    : 0,
+        },
     };
+};
+
+/** Same order of checks as the planner: sized before funded. */
+const fundNote = ({ target, gap, monthsToFill }: FundFigures): string => {
+    if (target <= 0) {
+        return 'Add your payables and allowance on the plan to size this.';
+    }
+
+    if (gap <= 0) {
+        return 'Funded. Savings now go to the pot.';
+    }
+
+    return monthsToFill !== null
+        ? `${formatPeso(gap)} to go · full in ${monthsToFill} ${monthsToFill === 1 ? 'month' : 'months'} at this rate.`
+        : `${formatPeso(gap)} to go · nothing going to savings yet.`;
 };
 
 export default function Dashboard() {
@@ -137,13 +188,10 @@ export default function Dashboard() {
         projectedCashflow,
         categories,
         totalSaved,
-        savingsGoal,
-        supportingStats,
+        savedPerMonth,
+        savingsBreakdown,
+        fund,
     } = deriveFigures(plan);
-
-    // A plan with no payables yet has nothing to size a fund against.
-    const fundedRatio =
-        savingsGoal > 0 ? Math.min(totalSaved / savingsGoal, 1) : 0;
     const categoryTotal = categories.reduce(
         (sum, item) => sum + item.amount,
         0,
@@ -154,16 +202,19 @@ export default function Dashboard() {
             label: 'Monthly expenses',
             value: monthlyExpenses,
             note: hasPlan ? 'Planned outgoing' : 'Outgoing this month',
+            icon: CreditCard,
         },
         {
             label: 'Outstanding debt',
             value: outstandingDebt,
             note: 'Remaining balance',
+            icon: Landmark,
         },
         {
             label: 'Projected cashflow',
             value: projectedCashflow,
             note: hasPlan ? 'Unallocated this month' : 'Next 30 days',
+            icon: TrendingUp,
         },
     ];
 
@@ -182,7 +233,11 @@ export default function Dashboard() {
                 {!hasPlan && (
                     <Card>
                         <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4">
-                            <p className="text-sm text-muted-foreground">
+                            <p className="flex items-start gap-2 text-sm text-muted-foreground">
+                                <Info
+                                    aria-hidden
+                                    className="mt-0.5 size-4 shrink-0"
+                                />
                                 These are sample figures. Set up your budget
                                 plan to see your own numbers here.
                             </p>
@@ -198,8 +253,11 @@ export default function Dashboard() {
                 <Card>
                     <CardContent className="flex flex-col gap-6 p-6 lg:flex-row lg:items-end lg:justify-between">
                         <div className="min-w-0">
-                            <p className="text-sm text-muted-foreground">
-                                {hasPlan ? 'Emergency fund' : 'Total saved'}
+                            <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                                <span className="flex size-7 items-center justify-center rounded-md bg-emerald-500/10 text-emerald-700 dark:text-emerald-300">
+                                    <PiggyBank aria-hidden className="size-4" />
+                                </span>
+                                Total saved
                             </p>
                             <p
                                 data-test="dashboard-saved"
@@ -208,32 +266,12 @@ export default function Dashboard() {
                                 {formatPeso(totalSaved)}
                             </p>
                             <p className="mt-2 text-sm text-muted-foreground tabular-nums">
-                                {Math.round(fundedRatio * 100)}% of your{' '}
-                                {formatPeso(savingsGoal)}{' '}
-                                {hasPlan ? 'target' : 'goal'}
+                                {formatPeso(savedPerMonth)} a month going in
                             </p>
-
-                            <div
-                                role="progressbar"
-                                aria-valuenow={Math.round(fundedRatio * 100)}
-                                aria-valuemin={0}
-                                aria-valuemax={100}
-                                aria-label={
-                                    hasPlan
-                                        ? 'Emergency fund progress'
-                                        : 'Savings goal progress'
-                                }
-                                className="mt-4 h-2 w-full overflow-hidden rounded-full bg-muted lg:w-80"
-                            >
-                                <div
-                                    className="h-full rounded-full bg-emerald-600 transition-[width] duration-500 motion-reduce:transition-none dark:bg-emerald-400"
-                                    style={{ width: `${fundedRatio * 100}%` }}
-                                />
-                            </div>
                         </div>
 
                         <dl className="flex shrink-0 gap-8">
-                            {supportingStats.map((stat) => (
+                            {savingsBreakdown.map((stat) => (
                                 <div key={stat.label}>
                                     <dt className="text-sm text-muted-foreground">
                                         {stat.label}
@@ -247,36 +285,104 @@ export default function Dashboard() {
                     </CardContent>
                 </Card>
 
-                <dl className="grid gap-4 sm:grid-cols-3">
+                {fund && (
+                    <Card>
+                        <CardHeader className="flex flex-row items-center justify-between gap-4">
+                            <CardTitle className="flex items-center gap-2 text-base">
+                                <ShieldCheck
+                                    aria-hidden
+                                    className="size-4 text-muted-foreground"
+                                />
+                                Emergency fund
+                            </CardTitle>
+                            <Button variant="ghost" size="sm" asChild>
+                                <Link href={financeRoute()}>Adjust</Link>
+                            </Button>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                                <p
+                                    data-test="dashboard-fund"
+                                    className="text-2xl font-semibold tracking-tight tabular-nums"
+                                >
+                                    {formatPeso(fund.balance)}
+                                </p>
+                                <p className="text-sm text-muted-foreground tabular-nums">
+                                    {fund.target > 0
+                                        ? `of ${formatPeso(fund.target)} target · ${fund.percent}% funded`
+                                        : 'not sized yet'}
+                                </p>
+                            </div>
+
+                            <div
+                                role="progressbar"
+                                aria-valuenow={fund.percent}
+                                aria-valuemin={0}
+                                aria-valuemax={100}
+                                aria-label="Emergency fund progress"
+                                className="mt-3 h-2 w-full overflow-hidden rounded-full bg-muted"
+                            >
+                                <div
+                                    className="h-full rounded-full bg-emerald-600 transition-[width] duration-500 motion-reduce:transition-none dark:bg-emerald-400"
+                                    style={{ width: `${fund.percent}%` }}
+                                />
+                            </div>
+
+                            <p
+                                data-test="dashboard-fund-note"
+                                className="mt-2 text-xs text-muted-foreground"
+                            >
+                                {fundNote(fund)}
+                            </p>
+                        </CardContent>
+                    </Card>
+                )}
+
+                {/*
+                 * Each tile owns its own <dl>. A single list wrapping the cards
+                 * put two divs between the list and its terms, which is not a
+                 * shape a description list is allowed to take.
+                 */}
+                <div className="grid gap-4 sm:grid-cols-3">
                     {metrics.map((metric) => (
                         <Card key={metric.label}>
                             <CardContent className="p-5">
-                                <dt className="text-sm text-muted-foreground">
-                                    {metric.label}
-                                </dt>
-                                <dd
-                                    className={`mt-1 text-2xl font-semibold tabular-nums ${
-                                        metric.value > 0
-                                            ? 'text-emerald-600 dark:text-emerald-400'
-                                            : 'text-foreground'
-                                    }`}
-                                >
-                                    {metric.value > 0
-                                        ? formatSigned(metric.value)
-                                        : formatPeso(metric.value)}
-                                </dd>
+                                <dl>
+                                    <dt className="flex items-center gap-2 text-sm text-muted-foreground">
+                                        <metric.icon
+                                            aria-hidden
+                                            className="size-4"
+                                        />
+                                        {metric.label}
+                                    </dt>
+                                    <dd
+                                        className={`mt-1 text-2xl font-semibold tabular-nums ${
+                                            metric.value > 0
+                                                ? 'text-emerald-700 dark:text-emerald-400'
+                                                : 'text-foreground'
+                                        }`}
+                                    >
+                                        {metric.value > 0
+                                            ? formatSigned(metric.value)
+                                            : formatPeso(metric.value)}
+                                    </dd>
+                                </dl>
                                 <p className="mt-1 text-xs text-muted-foreground">
                                     {metric.note}
                                 </p>
                             </CardContent>
                         </Card>
                     ))}
-                </dl>
+                </div>
 
                 <div className="grid items-start gap-6 xl:grid-cols-[1.5fr_1fr]">
                     <Card>
                         <CardHeader className="flex flex-row items-center justify-between gap-4">
-                            <CardTitle className="text-base">
+                            <CardTitle className="flex items-center gap-2 text-base">
+                                <ChartColumn
+                                    aria-hidden
+                                    className="size-4 text-muted-foreground"
+                                />
                                 Monthly savings
                             </CardTitle>
                             <Button variant="ghost" size="sm" asChild>
@@ -296,7 +402,11 @@ export default function Dashboard() {
 
                     <Card>
                         <CardHeader className="flex flex-row items-center justify-between gap-4">
-                            <CardTitle className="text-base">
+                            <CardTitle className="flex items-center gap-2 text-base">
+                                <ChartPie
+                                    aria-hidden
+                                    className="size-4 text-muted-foreground"
+                                />
                                 {hasPlan
                                     ? 'Planned by group'
                                     : 'Spending categories'}
@@ -350,7 +460,11 @@ export default function Dashboard() {
 
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between gap-4">
-                        <CardTitle className="text-base">
+                        <CardTitle className="flex items-center gap-2 text-base">
+                            <Activity
+                                aria-hidden
+                                className="size-4 text-muted-foreground"
+                            />
                             Recent activity
                         </CardTitle>
                         <Button variant="ghost" size="sm" asChild>
@@ -365,18 +479,44 @@ export default function Dashboard() {
                                 key={item.title}
                                 className="flex items-center justify-between gap-4 py-3"
                             >
-                                <div className="min-w-0">
-                                    <p className="truncate text-sm font-medium">
-                                        {item.title}
-                                    </p>
-                                    <p className="text-xs text-muted-foreground">
-                                        {item.when}
-                                    </p>
+                                <div className="flex min-w-0 items-center gap-3">
+                                    {/*
+                                     * The sign is already in the amount, so the
+                                     * arrow is decoration — it just gives the
+                                     * eye something to scan the column by.
+                                     */}
+                                    <span
+                                        className={`flex size-8 shrink-0 items-center justify-center rounded-full ${
+                                            item.amount > 0
+                                                ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
+                                                : 'bg-muted text-muted-foreground'
+                                        }`}
+                                    >
+                                        {item.amount > 0 ? (
+                                            <ArrowUpRight
+                                                aria-hidden
+                                                className="size-4"
+                                            />
+                                        ) : (
+                                            <ArrowDownRight
+                                                aria-hidden
+                                                className="size-4"
+                                            />
+                                        )}
+                                    </span>
+                                    <div className="min-w-0">
+                                        <p className="truncate text-sm font-medium">
+                                            {item.title}
+                                        </p>
+                                        <p className="text-xs text-muted-foreground">
+                                            {item.when}
+                                        </p>
+                                    </div>
                                 </div>
                                 <p
                                     className={`shrink-0 text-sm font-medium tabular-nums ${
                                         item.amount > 0
-                                            ? 'text-emerald-600 dark:text-emerald-400'
+                                            ? 'text-emerald-700 dark:text-emerald-400'
                                             : 'text-foreground'
                                     }`}
                                 >

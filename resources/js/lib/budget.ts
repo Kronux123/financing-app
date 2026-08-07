@@ -58,13 +58,22 @@ export type EmergencyFund = {
     balance: number;
 };
 
+export type SavingsPot = {
+    /**
+     * Savings that are not the emergency fund. Hand-entered for the same reason
+     * the fund's balance is — see the note there.
+     */
+    balance: number;
+};
+
 export type BudgetPlan = {
     /** Bumped when the shape changes, so stored plans can be migrated. */
-    version: 3;
+    version: 4;
     cadence: PayCadence;
     paychecks: Paycheck[];
     groups: ExpenseGroup[];
     emergencyFund: EmergencyFund;
+    savingsPot: SavingsPot;
 };
 
 export type PlanTotals = {
@@ -73,7 +82,7 @@ export type PlanTotals = {
     unallocated: number;
 };
 
-export const PLAN_VERSION = 3;
+export const PLAN_VERSION = 4;
 
 export const monthlyPaycheckId = 'monthly';
 export const midMonthPaycheckId = 'mid-month';
@@ -93,6 +102,10 @@ export const coverOptions: number[] = [3, 6];
 
 export const createEmergencyFund = (): EmergencyFund => {
     return { monthsOfCover: coverOptions[0], balance: 0 };
+};
+
+export const createSavingsPot = (): SavingsPot => {
+    return { balance: 0 };
 };
 
 /**
@@ -167,6 +180,7 @@ export const createPlan = (): BudgetPlan => {
         paychecks: paychecksFor('monthly'),
         groups: defaultGroupNames.map((group) => ({ ...group, items: [] })),
         emergencyFund: createEmergencyFund(),
+        savingsPot: createSavingsPot(),
     };
 };
 
@@ -389,6 +403,11 @@ export const emergencyTarget = (plan: BudgetPlan): number => {
     return essentialsPerMonth(plan) * plan.emergencyFund.monthsOfCover;
 };
 
+/** Both balances together — everything put by, wherever it sits. */
+export const totalSaved = (plan: BudgetPlan): number => {
+    return plan.emergencyFund.balance + plan.savingsPot.balance;
+};
+
 export type SavingsSplit = {
     essentials: number;
     target: number;
@@ -547,10 +566,22 @@ const isEmergencyFund = (value: unknown): value is EmergencyFund => {
     );
 };
 
+const isSavingsPot = (value: unknown): value is SavingsPot => {
+    if (typeof value !== 'object' || value === null) {
+        return false;
+    }
+
+    return typeof (value as Partial<SavingsPot>).balance === 'number';
+};
+
 /** A plan of any version, as it comes back out of storage. */
-type StoredPlan = Omit<BudgetPlan, 'version' | 'emergencyFund'> & {
+type StoredPlan = Omit<
+    BudgetPlan,
+    'version' | 'emergencyFund' | 'savingsPot'
+> & {
     version: number;
     emergencyFund?: unknown;
+    savingsPot?: unknown;
 };
 
 /**
@@ -579,7 +610,8 @@ const hasPlanShape = (value: unknown, version: number): boolean => {
 export const isBudgetPlan = (value: unknown): value is BudgetPlan => {
     return (
         hasPlanShape(value, PLAN_VERSION) &&
-        isEmergencyFund((value as StoredPlan).emergencyFund)
+        isEmergencyFund((value as StoredPlan).emergencyFund) &&
+        isSavingsPot((value as StoredPlan).savingsPot)
     );
 };
 
@@ -612,15 +644,16 @@ const regroupedFromV1 = (previous: StoredPlan): ExpenseGroup[] => {
  *
  * v1 had Needs, Utilities, Wants and Savings; the first two became Payables and
  * Wants became Allowance, so nothing entered is lost. v2 predates the emergency
- * fund and gets a fresh one. A current plan carrying a damaged fund keeps its
- * expenses and gets the fund reset, rather than being thrown away whole.
+ * fund and v3 the savings pot, so each gets a fresh one. A current plan carrying
+ * a damaged balance keeps its expenses and has that balance reset, rather than
+ * being thrown away whole.
  */
 export const migratePlan = (value: unknown): BudgetPlan | null => {
     if (isBudgetPlan(value)) {
         return value;
     }
 
-    const storedVersion = [1, 2, PLAN_VERSION].find((version) =>
+    const storedVersion = [1, 2, 3, PLAN_VERSION].find((version) =>
         hasPlanShape(value, version),
     );
 
@@ -638,6 +671,9 @@ export const migratePlan = (value: unknown): BudgetPlan | null => {
         emergencyFund: isEmergencyFund(previous.emergencyFund)
             ? previous.emergencyFund
             : createEmergencyFund(),
+        savingsPot: isSavingsPot(previous.savingsPot)
+            ? previous.savingsPot
+            : createSavingsPot(),
     };
 };
 

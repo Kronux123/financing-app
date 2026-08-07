@@ -154,6 +154,25 @@ test('an unsaved plan is not persisted', function () {
         ->assertDontSee('Unsaved changes');
 });
 
+test('an amount field keeps digits and a decimal point, and drops the rest', function () {
+    $page = visit(route('finance.edit'));
+
+    $page->type('@income-monthly', 'abc12def34')
+        ->assertValue('@income-monthly', '1234')
+        ->type('@amount-savings-monthly', '₱2,500')
+        ->assertValue('@amount-savings-monthly', '2500')
+        ->assertSeeIn('@allocated-monthly', '₱2,500')
+        ->type('@fund-balance', '1.50')
+        ->assertValue('@fund-balance', '1.50');
+});
+
+test('a second decimal point folds into the first', function () {
+    $page = visit(route('finance.edit'));
+
+    $page->type('@income-monthly', '1.2.3')
+        ->assertValue('@income-monthly', '1.23');
+});
+
 test('a payable can carry an end date that survives a reload', function () {
     $page = visit(route('finance.edit'));
 
@@ -397,7 +416,20 @@ test('the emergency fund survives a reload', function () {
         ->assertSeeIn('@fund-target', '₱60,000');
 });
 
-test('the dashboard shows the emergency fund instead of samples', function () {
+test('the pot balance is kept alongside the fund', function () {
+    $page = visit(route('finance.edit'));
+
+    $page->type('@income-monthly', '30000')
+        ->type('@fund-balance', '12000')
+        ->type('@pot-balance', '8000')
+        ->click('@save-plan');
+
+    $page->refresh()
+        ->assertValue('@fund-balance', '12000')
+        ->assertValue('@pot-balance', '8000');
+});
+
+test('the dashboard leads with total saved and gives the fund its own card', function () {
     $page = visit(route('finance.edit'));
 
     $page->type('@income-monthly', '30000')
@@ -405,15 +437,28 @@ test('the dashboard shows the emergency fund instead of samples', function () {
         ->type('@item-amount-payables-monthly-0', '10000')
         ->type('@amount-savings-monthly', '5000')
         ->type('@fund-balance', '12000')
+        ->type('@pot-balance', '8000')
         ->click('@save-plan');
 
     $page->click('Back to dashboard')
         ->assertPathIs('/dashboard')
-        ->assertSee('Emergency fund')
-        ->assertSeeIn('@dashboard-saved', '₱12,000')
+        ->assertSeeIn('@dashboard-saved', '₱20,000')
+        ->assertSee('₱5,000 a month going in')
+        ->assertSee('Savings pot')
+        ->assertSeeIn('@dashboard-fund', '₱12,000')
         ->assertSee('₱30,000 target')
-        ->assertSee('Still to go')
+        ->assertSeeIn('@dashboard-fund-note', '₱18,000 to go')
+        ->assertSeeIn('@dashboard-fund-note', 'full in 4 months')
         ->assertDontSee('Emergency buffer')
+        ->assertNoJavaScriptErrors();
+});
+
+test('the dashboard hides the fund card until a plan exists', function () {
+    $page = visit(route('dashboard'));
+
+    $page->assertSee('These are sample figures')
+        ->assertSeeIn('@dashboard-saved', '₱82,400')
+        ->assertMissing('@dashboard-fund')
         ->assertNoJavaScriptErrors();
 });
 

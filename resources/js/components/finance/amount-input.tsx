@@ -15,6 +15,20 @@ type AmountInputProps = {
 };
 
 /**
+ * Digits and at most one decimal point. Anything else is dropped as it is
+ * typed, so the field can never show a figure the plan will not store — and a
+ * pasted `₱1,234` lands as `1234` rather than sitting there looking accepted.
+ *
+ * A second point folds into the first group of decimals, so `1.2.3` becomes
+ * `1.23` instead of throwing away the keystroke.
+ */
+const toAmountText = (value: string): string => {
+    const [whole, ...rest] = value.replace(/[^\d.]/g, '').split('.');
+
+    return rest.length > 0 ? `${whole}.${rest.join('')}` : whole;
+};
+
+/**
  * A peso field that keeps what the user is midway through typing.
  *
  * The plan stores amounts as numbers, but `1200.` and `007` are not yet
@@ -40,9 +54,10 @@ export function AmountInput({
     }
 
     const handleChange = (next: string) => {
-        const parsed = parsePeso(next);
+        const text = toAmountText(next);
+        const parsed = parsePeso(text);
 
-        setDraft(next);
+        setDraft(text);
         setLastValue(parsed);
         onValueChange(parsed);
     };

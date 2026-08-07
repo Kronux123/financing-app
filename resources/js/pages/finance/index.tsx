@@ -1,9 +1,9 @@
 import { Head, Link } from '@inertiajs/react';
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { EmergencyFundCard } from '@/components/finance/emergency-fund-card';
 import { PaycheckCard } from '@/components/finance/paycheck-card';
 import { PlanSummary } from '@/components/finance/plan-summary';
+import { SavingsCard } from '@/components/finance/savings-card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
@@ -273,13 +273,19 @@ export default function Finance() {
                     <div className="space-y-4">
                         <PlanSummary plan={plan} />
 
-                        <EmergencyFundCard
+                        <SavingsCard
                             plan={plan}
                             onMonthsOfCoverChange={(monthsOfCover) =>
                                 handleEmergencyFundChange({ monthsOfCover })
                             }
                             onBalanceChange={(balance) =>
                                 handleEmergencyFundChange({ balance })
+                            }
+                            onPotBalanceChange={(balance) =>
+                                updatePlan({
+                                    ...plan,
+                                    savingsPot: { ...plan.savingsPot, balance },
+                                })
                             }
                         />
 

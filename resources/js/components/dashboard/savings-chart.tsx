@@ -61,7 +61,13 @@ export function SavingsChart({ data, goal, formatAmount }: SavingsChartProps) {
                                     </p>
                                 )}
 
+                                {/*
+                                 * `role="img"` earns the bar its aria-label —
+                                 * a bare div cannot carry one, and the label is
+                                 * the only way the figure reads out.
+                                 */}
                                 <div
+                                    role="img"
                                     tabIndex={0}
                                     aria-label={`${point.month}: ${formatAmount(point.amount)}, ${Math.round(share)} percent of monthly goal`}
                                     style={{

@@ -14,10 +14,11 @@ import { coverOptions, savingsSplit } from '@/lib/budget';
 import { formatPeso } from '@/lib/currency';
 import { cn } from '@/lib/utils';
 
-type EmergencyFundCardProps = {
+type SavingsCardProps = {
     plan: BudgetPlan;
     onMonthsOfCoverChange: (monthsOfCover: number) => void;
     onBalanceChange: (balance: number) => void;
+    onPotBalanceChange: (balance: number) => void;
 };
 
 /**
@@ -73,11 +74,12 @@ const forecastFor = ({
     return `Full in ${monthsToFill} ${monthsToFill === 1 ? 'month' : 'months'} at this rate.`;
 };
 
-export function EmergencyFundCard({
+export function SavingsCard({
     plan,
     onMonthsOfCoverChange,
     onBalanceChange,
-}: EmergencyFundCardProps) {
+    onPotBalanceChange,
+}: SavingsCardProps) {
     const split = savingsSplit(plan);
     const { target, balance, gap, saved, toEmergency, toPot } = split;
     const status = statusFor(target, gap);
@@ -93,10 +95,12 @@ export function EmergencyFundCard({
     return (
         <Card className="gap-4">
             <CardHeader>
-                <CardTitle className="text-base">Emergency fund</CardTitle>
+                <CardTitle className="text-base">Savings</CardTitle>
                 <CardDescription>
+                    The emergency fund fills first —{' '}
                     {plan.emergencyFund.monthsOfCover} months of payables and
-                    allowance, for when the income stops.
+                    allowance, for when the income stops. What is left over
+                    lands in the pot.
                 </CardDescription>
             </CardHeader>
 
@@ -128,40 +132,67 @@ export function EmergencyFundCard({
                     </ToggleGroup>
                 </div>
 
-                <div className="grid gap-1.5">
-                    <Label htmlFor="fund-balance">Set aside so far</Label>
-                    <AmountInput
-                        id="fund-balance"
-                        data-test="fund-balance"
-                        value={balance}
-                        onValueChange={onBalanceChange}
-                    />
-                    <p className="text-xs text-muted-foreground">
-                        Your own figure. The plan plots what is coming, not what
-                        your accounts hold.
-                    </p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="grid gap-1.5">
+                        <Label htmlFor="fund-balance">In the fund</Label>
+                        <AmountInput
+                            id="fund-balance"
+                            data-test="fund-balance"
+                            value={balance}
+                            onValueChange={onBalanceChange}
+                        />
+                    </div>
+                    <div className="grid gap-1.5">
+                        <Label htmlFor="pot-balance">In the pot</Label>
+                        <AmountInput
+                            id="pot-balance"
+                            data-test="pot-balance"
+                            value={plan.savingsPot.balance}
+                            onValueChange={onPotBalanceChange}
+                        />
+                    </div>
                 </div>
+
+                <p className="-mt-3 text-xs text-muted-foreground">
+                    Both are your own figures. The plan plots what is coming,
+                    not what your accounts hold.
+                </p>
 
                 <div className={cn('rounded-lg p-3', status.surface)}>
                     <div className="flex items-baseline justify-between gap-2">
                         <p className="text-xs font-medium tracking-wide uppercase">
                             {status.label}
                         </p>
-                        <p className="text-xs text-foreground/70 tabular-nums">
-                            {percent}% funded
-                        </p>
+                        {target > 0 && (
+                            <p className="text-xs text-foreground/70 tabular-nums">
+                                {percent}% funded
+                            </p>
+                        )}
                     </div>
 
+                    {/*
+                     * The balance leads and the target follows, matching the
+                     * dashboard. Leading with the target read as though the
+                     * figure you had just typed had been ignored.
+                     */}
                     <p
-                        data-test="fund-target"
+                        data-test="fund-balance-shown"
                         className="mt-1.5 text-2xl font-semibold tracking-tight tabular-nums"
                     >
-                        {formatPeso(target)}
+                        {formatPeso(balance)}
                     </p>
                     <p className="text-xs text-foreground/70 tabular-nums">
-                        {target <= 0
-                            ? 'Set your payables and allowance to size this'
-                            : `target · ${formatPeso(gap)} to go`}
+                        {target <= 0 ? (
+                            'set aside · add payables and allowance to size this'
+                        ) : (
+                            <>
+                                of{' '}
+                                <span data-test="fund-target">
+                                    {formatPeso(target)}
+                                </span>{' '}
+                                target · {formatPeso(gap)} to go
+                            </>
+                        )}
                     </p>
 
                     <div
