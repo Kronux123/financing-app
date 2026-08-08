@@ -117,12 +117,18 @@ const todayValue = (today: Date): string => {
     ].join('-');
 };
 
+/**
+ * The schedule in words. The weekend rule is spelled out because it decides
+ * which date a payday actually lands on, and the payouts page shows that date
+ * rather than the one the paycheck is set to.
+ */
 const paydayDescription = (paycheck: Paycheck): string => {
-    if (paycheck.dayOfMonth === 'last') {
-        return 'Paid on the last day of the month';
-    }
+    const day =
+        paycheck.dayOfMonth === 'last'
+            ? 'the last day of the month'
+            : `the ${paycheck.dayOfMonth}th`;
 
-    return `Paid on the ${paycheck.dayOfMonth}th`;
+    return `Paid on ${day}, or the Friday before if that is a weekend`;
 };
 
 /** The swept savings line, which is derived and so cannot be edited here. */

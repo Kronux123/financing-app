@@ -27,8 +27,10 @@ test('opening paydays is on the schedule, daily', function () {
 });
 
 // Daily is what lets the command own the calendar: a payday set to the 31st
-// still has to land in February, and cron cannot express that.
-test('a payday on the 31st opens on the last day of a short month', function () {
+// still has to land in February, and cron cannot express that. February 2026
+// then ends on a Saturday, so the pay lands on the Friday before it — both rules
+// at once, which is the case worth pinning.
+test('a payday on the 31st opens on the last weekday of a short month', function () {
     $this->travelTo('2026-03-02 09:00');
 
     $plan = BudgetPlan::factory()->create();
@@ -42,7 +44,7 @@ test('a payday on the 31st opens on the last day of a short month', function () 
     $this->artisan('payouts:open')->assertSuccessful();
 
     expect(Payout::query()->pluck('paid_on')->map->toDateString()->all())
-        ->toBe(['2026-02-28']);
+        ->toBe(['2026-02-27']);
 });
 
 test('a payday later this month is not opened early', function () {
@@ -60,13 +62,14 @@ test('a payday later this month is not opened early', function () {
 
     expect(Payout::count())->toBe(0);
 
-    // Five days later it has been, and the daily run picks it up.
+    // Days later it has been, and the daily run picks it up. The 15th is a Sunday
+    // that March, so the money actually arrived on the Friday the 13th.
     $this->travelTo('2026-03-16 09:00');
 
     $this->artisan('payouts:open')->assertSuccessful();
 
     expect(Payout::query()->pluck('paid_on')->map->toDateString()->all())
-        ->toBe(['2026-03-15']);
+        ->toBe(['2026-03-13']);
 });
 
 // A run that never happened has to be recoverable by the next one, which is the
@@ -79,11 +82,11 @@ test('a missed run is caught up by the next one', function () {
 
     Paycheck::factory()->for($plan)->create(['key' => 'monthly', 'day_of_month' => null]);
 
-    // Nothing ran on the 28th of February. A week later, it is still opened.
+    // Nothing ran on the 27th of February. A week later, it is still opened.
     $this->travelTo('2026-03-07 09:00');
 
     $this->artisan('payouts:open')->assertSuccessful();
 
     expect(Payout::query()->pluck('paid_on')->map->toDateString()->all())
-        ->toBe(['2026-02-28']);
+        ->toBe(['2026-02-27']);
 });

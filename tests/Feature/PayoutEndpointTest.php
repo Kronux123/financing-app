@@ -156,6 +156,50 @@ test('correcting what came in records the actuals', function () {
         ->and($payout->incomes->first()->planned)->toBe(2_500_000);
 });
 
+/*
+ * A paycheck that funds nothing still opens a payday, so a record with no lines
+ * at all is an ordinary case rather than an edge one — and its correction has to
+ * go through.
+ */
+test('a payday with nothing planned against it can still be corrected', function () {
+    $user = User::factory()->create();
+    $payout = Payout::factory()->for($user)->withPaycheckIncome(2_500_000)->create();
+    $payout->load(['incomes', 'lines']);
+
+    $this->actingAs($user)
+        ->put(route('payouts.update', $payout), [
+            'incomes' => [[
+                'id' => $payout->incomes->first()->id,
+                'source' => IncomeSource::Paycheck->value,
+                'label' => 'Monthly pay',
+                'actual' => 24_800,
+            ]],
+            'lines' => [],
+        ])
+        ->assertSessionHasNoErrors();
+
+    expect($payout->refresh()->actualIncome())->toBe(2_480_000);
+});
+
+// The other half of the browser test: what the page reads on the way back in is
+// the correction, not the figure the payday was opened with.
+test('a correction is what the next page load reads', function () {
+    $user = User::factory()->create();
+    $payout = payoutFor($user);
+
+    $this->actingAs($user)
+        ->put(route('payouts.update', $payout), payoutPayload($payout, income: 24_800))
+        ->assertSessionHasNoErrors();
+
+    $this->actingAs($user)
+        ->get(route('payouts.index'))
+        ->assertInertia(
+            fn (AssertableInertia $page) => $page
+                ->where('payouts.0.incomes.0.actual', 24_800)
+                ->etc()
+        );
+});
+
 test('a line added while reviewing is unplanned spending', function () {
     $user = User::factory()->create();
     $payout = payoutFor($user);

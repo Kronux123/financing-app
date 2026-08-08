@@ -29,20 +29,59 @@ test('a cadence knows the paychecks it implies', function () {
         ->and($plan->paychecks->pluck('key')->all())->toBe(['mid-month', 'end-month']);
 });
 
+// June 2026 ends on a Tuesday, so only the one rule is in play here.
 test('a paycheck with no day of the month pays on the last one', function () {
     $paycheck = Paycheck::factory()->create(['day_of_month' => null]);
 
     expect($paycheck->paysOnLastDay())->toBeTrue()
-        ->and($paycheck->payday(Carbon\Carbon::parse('2026-02-10'))->toDateString())
-        ->toBe('2026-02-28');
+        ->and($paycheck->payday(Carbon\Carbon::parse('2026-06-10'))->toDateString())
+        ->toBe('2026-06-30');
 });
 
-// A paycheck set to the 31st still has to pay in February.
+// A paycheck set to the 31st still has to pay in February. 2025 is used because
+// that February ends on a Friday, which keeps the weekend rule out of it.
 test('a payday past the end of a short month is pulled back', function () {
     $paycheck = Paycheck::factory()->create(['day_of_month' => 31]);
 
-    expect($paycheck->payday(Carbon\Carbon::parse('2026-02-10'))->toDateString())
-        ->toBe('2026-02-28');
+    expect($paycheck->payday(Carbon\Carbon::parse('2025-02-10'))->toDateString())
+        ->toBe('2025-02-28');
+});
+
+/*
+ * Payroll pays early rather than late. A salary due on a weekend is handed over
+ * on the Friday before, so a Saturday moves back a day and a Sunday two — both
+ * landing on the same Friday.
+ */
+test('a payday on a Saturday is paid the Friday before', function () {
+    $paycheck = Paycheck::factory()->create(['day_of_month' => 15]);
+
+    // 15 August 2026 is a Saturday.
+    expect($paycheck->payday(Carbon\Carbon::parse('2026-08-01'))->toDateString())
+        ->toBe('2026-08-14');
+});
+
+test('a payday on a Sunday is paid the Friday before', function () {
+    $paycheck = Paycheck::factory()->create(['day_of_month' => 15]);
+
+    // 15 March 2026 is a Sunday, so it is paid on the 13th rather than the 14th.
+    expect($paycheck->payday(Carbon\Carbon::parse('2026-03-01'))->toDateString())
+        ->toBe('2026-03-13');
+});
+
+test('a last day payday on a weekend is paid the Friday before', function () {
+    $paycheck = Paycheck::factory()->create(['day_of_month' => null]);
+
+    // May 2026 ends on a Sunday.
+    expect($paycheck->payday(Carbon\Carbon::parse('2026-05-01'))->toDateString())
+        ->toBe('2026-05-29');
+});
+
+test('a payday on a weekday is left where it is', function () {
+    $paycheck = Paycheck::factory()->create(['day_of_month' => 15]);
+
+    // 15 July 2026 is a Wednesday.
+    expect($paycheck->payday(Carbon\Carbon::parse('2026-07-01'))->toDateString())
+        ->toBe('2026-07-15');
 });
 
 test('the emergency fund target leaves savings out', function () {

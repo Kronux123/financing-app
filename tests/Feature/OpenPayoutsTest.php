@@ -17,7 +17,14 @@ function planOpenSince(string $since = '-6 months'): BudgetPlan
     return $plan->refresh();
 }
 
+/*
+ * Time is pinned rather than left to whenever the suite runs, because the date
+ * asserted here depends on the calendar: May 2026 ends on a Sunday, so the
+ * command has to open the record against the Friday before it.
+ */
 test('a payday that has been gets a pending record', function () {
+    $this->travelTo('2026-06-10 09:00');
+
     $plan = planOpenSince();
 
     $this->artisan('payouts:open')->assertSuccessful();
@@ -28,8 +35,7 @@ test('a payday that has been gets a pending record', function () {
         ->and($payout->status)->toBe(PayoutStatus::Pending)
         ->and($payout->user_id)->toBe($plan->user_id)
         ->and($payout->paycheck_key)->toBe('monthly')
-        ->and($payout->paid_on->toDateString())
-        ->toBe(now()->subMonth()->endOfMonth()->toDateString());
+        ->and($payout->paid_on->toDateString())->toBe('2026-05-29');
 });
 
 // The unique key is the backstop, but the command should not lean on an
@@ -44,6 +50,8 @@ test('running twice opens nothing the second time', function () {
 });
 
 test('a payday still to come is left alone', function () {
+    $this->travelTo('2026-06-10 09:00');
+
     planOpenSince();
 
     // This month's last day has not arrived, so only last month's is opened.
@@ -51,8 +59,8 @@ test('a payday still to come is left alone', function () {
 
     $this->artisan('payouts:open')->assertSuccessful();
 
-    expect(Payout::query()->where('paid_on', now()->endOfMonth()->toDateString())->exists())
-        ->toBeFalse();
+    expect(Payout::query()->where('paid_on', '2026-06-30')->exists())->toBeFalse()
+        ->and(Payout::count())->toBe(1);
 });
 
 // The app has nothing to say about months it was not around for.

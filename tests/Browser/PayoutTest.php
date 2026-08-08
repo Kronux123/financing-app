@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\BudgetPlan;
+use App\Models\Payout;
 use App\Models\User;
 use Illuminate\Support\Facades\Artisan;
 
@@ -11,15 +12,20 @@ beforeEach(function () {
 });
 
 /**
- * The card key for the most recent monthly payday that has already happened.
- * The monthly paycheck pays on the last day, so unless today is that day the
- * newest record belongs to last month.
+ * The card key of the newest payday on the ledger, which is the one the page
+ * opens on arrival.
+ *
+ * Read off the record rather than worked out from the calendar. Which date a
+ * payday lands on is the server's arithmetic — the 15th and the last day both
+ * move back to the Friday before when they fall on a weekend — so a test that
+ * recomputed it would only repeat the code it is meant to be checking. The
+ * formula for the key itself is pinned in PayoutEndpointTest.
  */
-function lastMonthlyPayoutKey(): string
+function newestPayoutKey(): string
 {
-    $month = now()->endOfMonth()->isToday() ? now() : now()->subMonth();
+    $payout = Payout::query()->orderByDesc('paid_on')->firstOrFail();
 
-    return $month->format('Y-m').'-monthly';
+    return $payout->paid_on->format('Y-m').'-'.$payout->paycheck_key;
 }
 
 /**
@@ -76,7 +82,7 @@ test('a plan with no payday behind it yet says so', function () {
 
 test('a payday that has been round shows up filled in from the plan', function () {
     planWithOpenPayouts($this->user, withPayables: true);
-    $key = lastMonthlyPayoutKey();
+    $key = newestPayoutKey();
 
     $page = visit(route('payouts.index'));
 
@@ -93,7 +99,7 @@ test('a payday that has been round shows up filled in from the plan', function (
 
 test('a payday starts pending and can be finalized', function () {
     planWithOpenPayouts($this->user);
-    $key = lastMonthlyPayoutKey();
+    $key = newestPayoutKey();
 
     $page = visit(route('payouts.index'));
 
@@ -105,7 +111,7 @@ test('a payday starts pending and can be finalized', function () {
 
 test('correcting what actually came in shows the variance', function () {
     planWithOpenPayouts($this->user, withPayables: true);
-    $key = lastMonthlyPayoutKey();
+    $key = newestPayoutKey();
 
     $page = visit(route('payouts.index'));
 
@@ -119,7 +125,7 @@ test('correcting what actually came in shows the variance', function () {
 
 test('a finalized payday cannot be edited until it is reopened', function () {
     planWithOpenPayouts($this->user);
-    $key = lastMonthlyPayoutKey();
+    $key = newestPayoutKey();
 
     $page = visit(route('payouts.index'));
 
@@ -131,12 +137,14 @@ test('a finalized payday cannot be edited until it is reopened', function () {
 
 test('a corrected payday survives a reload', function () {
     planWithOpenPayouts($this->user);
-    $key = lastMonthlyPayoutKey();
+    $key = newestPayoutKey();
 
     $page = visit(route('payouts.index'));
 
     $page->type("@payout-income-{$key}-0", '24800')
         ->click("@payout-save-{$key}")
+        ->assertSee('Payday updated.')
+        // The button is only there while something is unsaved.
         ->assertMissing("@payout-save-{$key}");
 
     // Nothing was walked to here, so refresh() lands back on this page.
@@ -147,7 +155,7 @@ test('a corrected payday survives a reload', function () {
 
 test('finalizing writes down a correction that was still open', function () {
     planWithOpenPayouts($this->user);
-    $key = lastMonthlyPayoutKey();
+    $key = newestPayoutKey();
 
     $page = visit(route('payouts.index'));
 
@@ -164,7 +172,7 @@ test('finalizing writes down a correction that was still open', function () {
 // editing the plan afterwards must not rewrite it.
 test('a finalized payday stops following the plan', function () {
     planWithOpenPayouts($this->user);
-    $key = lastMonthlyPayoutKey();
+    $key = newestPayoutKey();
 
     $page = visit(route('payouts.index'));
 
@@ -185,7 +193,7 @@ test('a finalized payday stops following the plan', function () {
  */
 test('an untouched payday does not follow the plan either', function () {
     planWithOpenPayouts($this->user);
-    $key = lastMonthlyPayoutKey();
+    $key = newestPayoutKey();
 
     $page = visit(route('payouts.index'));
 
@@ -218,7 +226,7 @@ test('the payouts page has no accessibility issues', function () {
 
 test('the payouts page has no accessibility issues in dark mode', function () {
     planWithOpenPayouts($this->user);
-    $key = lastMonthlyPayoutKey();
+    $key = newestPayoutKey();
 
     $page = visit(route('payouts.index'))->inDarkMode();
 

@@ -59,12 +59,32 @@ class Paycheck extends Model
     }
 
     /**
-     * The date this paycheck lands in the given month.
+     * The date this paycheck actually lands in the given month.
      *
-     * A day past the end of a short month is pulled back to the last one, so a
-     * paycheck set to the 31st still pays in February.
+     * Two things move it off the day it is set to. A day past the end of a short
+     * month is pulled back to the last one, so a paycheck set to the 31st still
+     * pays in February. And a payday falling on a weekend is paid on the Friday
+     * before it, because payroll pays early rather than late — a Saturday moves
+     * back one day, a Sunday two, and both land on the same Friday.
+     *
+     * Only Saturday and Sunday are accounted for. Holidays are not: they vary by
+     * country and by year, and the plan has nowhere to record them.
      */
     public function payday(CarbonInterface $month): CarbonInterface
+    {
+        $due = $this->scheduledDay($month);
+
+        /*
+         * A payday on the 1st or 2nd can be taken back into the month before,
+         * which is right in itself but would key the record to that month. No
+         * cadence the app offers pays that early — the 15th and the last day are
+         * the only ones — so this is a note rather than a case to handle.
+         */
+        return $due->isWeekend() ? $due->previousWeekday() : $due;
+    }
+
+    /** Where the paycheck falls before the calendar has its say. */
+    private function scheduledDay(CarbonInterface $month): CarbonInterface
     {
         $endOfMonth = $month->copy()->endOfMonth();
 
