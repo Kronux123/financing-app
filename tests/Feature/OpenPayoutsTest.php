@@ -122,8 +122,8 @@ test('semi-monthly pay opens two records a month', function () {
     $this->artisan('payouts:open')->assertSuccessful();
 
     // Last month's 15th and last day, plus this month's 15th if it has passed.
-    expect(Payout::query()->where('paycheck_key', 'mid_month')->exists())->toBeTrue()
-        ->and(Payout::query()->where('paycheck_key', 'end_month')->exists())->toBeTrue();
+    expect(Payout::query()->where('paycheck_key', 'mid-month')->exists())->toBeTrue()
+        ->and(Payout::query()->where('paycheck_key', 'end-month')->exists())->toBeTrue();
 });
 
 test('a deleted payday is not reopened behind your back', function () {

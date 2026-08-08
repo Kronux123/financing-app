@@ -26,7 +26,7 @@ test('a cadence knows the paychecks it implies', function () {
     $plan = BudgetPlan::factory()->semiMonthly()->withPaychecks()->create();
 
     expect($plan->paychecks)->toHaveCount(2)
-        ->and($plan->paychecks->pluck('key')->all())->toBe(['mid_month', 'end_month']);
+        ->and($plan->paychecks->pluck('key')->all())->toBe(['mid-month', 'end-month']);
 });
 
 test('a paycheck with no day of the month pays on the last one', function () {

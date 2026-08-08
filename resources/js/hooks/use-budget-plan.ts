@@ -1,91 +1,96 @@
-import { useState, useSyncExternalStore } from 'react';
+import { router, usePage } from '@inertiajs/react';
+import { useMemo, useState } from 'react';
 import type { BudgetPlan } from '@/lib/budget';
-import { createPlan, migratePlan, withSweptRemainders } from '@/lib/budget';
-
-export const budgetPlanStorageKey = 'budgetPlan';
-
-/** Written by the old finance settings form, read by nothing. Cleared on load. */
-const retiredStorageKey = 'financeSettings';
-
-const listeners = new Set<() => void>();
-
-let currentPlan: BudgetPlan | null = null;
-
-const notify = (): void => listeners.forEach((listener) => listener());
-
-const subscribe = (callback: () => void) => {
-    listeners.add(callback);
-
-    return () => listeners.delete(callback);
-};
-
-const readStorage = (): BudgetPlan | null => {
-    const stored = window.localStorage.getItem(budgetPlanStorageKey);
-
-    if (!stored) {
-        return null;
-    }
-
-    try {
-        const migrated = migratePlan(JSON.parse(stored));
-
-        if (!migrated) {
-            window.localStorage.removeItem(budgetPlanStorageKey);
-
-            return null;
-        }
-
-        return migrated;
-    } catch {
-        window.localStorage.removeItem(budgetPlanStorageKey);
-
-        return null;
-    }
-};
+import { createPlan, isRemainderItem, withSweptRemainders } from '@/lib/budget';
+import { update as updatePlan } from '@/routes/finance';
 
 /**
- * Hydrates at module load rather than during render, so the snapshot React
- * reads is a stable reference. `useSyncExternalStore` bridges the gap between
- * the server's null and this value without a hydration mismatch.
- */
-if (typeof window !== 'undefined') {
-    currentPlan = readStorage();
-    window.localStorage.removeItem(retiredStorageKey);
-}
-
-export const saveBudgetPlan = (plan: BudgetPlan): void => {
-    window.localStorage.setItem(budgetPlanStorageKey, JSON.stringify(plan));
-    currentPlan = plan;
-    notify();
-};
-
-export const clearBudgetPlan = (): void => {
-    window.localStorage.removeItem(budgetPlanStorageKey);
-    currentPlan = null;
-    notify();
-};
-
-/**
- * The last saved plan, or `null` when nothing has been saved yet. Shared across
- * pages, so saving on the finance page updates the dashboard immediately.
+ * The saved plan, as the server sent it, with its swept lines put back.
+ *
+ * Shared from `HandleInertiaRequests`, so every page has it without asking. It
+ * arrives in the page payload, which means there is no loading state and no
+ * hydration dance — the value is the same on the server and the client.
+ *
+ * The sweep is applied here rather than on the page that edits one, so the
+ * dashboard and the debt page count the swept savings too. Memoised on the prop
+ * because the draft below watches its identity to notice a fresh plan.
  */
 export function useStoredBudgetPlan(): BudgetPlan | null {
-    return useSyncExternalStore(
-        subscribe,
-        () => currentPlan,
-        () => null,
+    const stored = usePage<{ plan: BudgetPlan | null }>().props.plan;
+
+    return useMemo(
+        () => (stored === null ? null : withSweptRemainders(stored)),
+        [stored],
     );
 }
 
+/** Writes the plan, then lets the shared prop come back with the saved copy. */
+export const saveBudgetPlan = (
+    plan: BudgetPlan,
+    onSuccess?: () => void,
+): void => {
+    router.put(updatePlan().url, serialise(plan), {
+        preserveScroll: true,
+        onSuccess,
+    });
+};
+
 /**
- * The plan being edited alongside the one last written to storage. Holding both
- * in a single state value keeps them in step, so an untouched page can never
- * report itself as dirty.
+ * The plan on the wire.
+ *
+ * Groups are flattened, because the group is a property of a row rather than
+ * something a row lives inside. Ids that were made up on this page are dropped:
+ * a number means a row the server already has, anything else is new.
+ *
+ * The swept remainder is left behind. It is worked out from the paycheck and
+ * everything else on it, so storing it would mean keeping a figure in step with
+ * the numbers it is computed from — see the expense_items migration, which says
+ * the same thing from the other side. `savesRemainder` travels on the paycheck,
+ * and that is enough to rebuild the line on the way back in.
+ */
+const serialise = (plan: BudgetPlan) => {
+    return {
+        cadence: plan.cadence,
+        emergencyFund: plan.emergencyFund,
+        savingsPot: plan.savingsPot,
+        /**
+         * Spelled out rather than passed through: several of these are optional
+         * on the type, and an absent key is not the same as `false` once it
+         * reaches a validator.
+         */
+        paychecks: plan.paychecks.map((paycheck) => ({
+            id: paycheck.id,
+            label: paycheck.label,
+            dayOfMonth: paycheck.dayOfMonth,
+            amount: paycheck.amount,
+            savesRemainder: paycheck.savesRemainder ?? false,
+        })),
+        items: plan.groups.flatMap((group) =>
+            group.items
+                .filter((item) => !isRemainderItem(item))
+                .map((item) => ({
+                    id: /^\d+$/.test(item.id) ? item.id : null,
+                    paycheckId: item.paycheckId,
+                    group: group.id,
+                    name: item.name,
+                    amount: item.amount,
+                    startedOn: item.startedOn ?? null,
+                    endsOn: item.endsOn ?? null,
+                    isDebt: item.isDebt ?? false,
+                })),
+        ),
+    };
+};
+
+/**
+ * The plan being edited alongside the one the server holds. Holding both in a
+ * single state value keeps them in step, so an untouched page can never report
+ * itself as dirty.
  */
 type Draft = {
     plan: BudgetPlan;
     saved: BudgetPlan;
-    /** The stored plan this draft was seeded from, to detect late hydration. */
+    /** The prop this draft was seeded from, to notice a fresh one arriving. */
     source: BudgetPlan | null;
 };
 
@@ -93,13 +98,11 @@ export type PlanDraft = {
     plan: BudgetPlan;
     isDirty: boolean;
     update: (next: BudgetPlan) => void;
-    save: () => void;
+    save: (onSuccess?: () => void) => void;
 };
 
 /**
- * An editable copy of the stored plan, shared by every page that edits one — the
- * budget and the debt list are two views of the same saved plan, and the late
- * hydration dance below is too easy to get subtly wrong twice.
+ * An editable copy of the saved plan, shared by every page that edits one.
  */
 export function useBudgetPlanDraft(): PlanDraft {
     const storedPlan = useStoredBudgetPlan();
@@ -109,7 +112,7 @@ export function useBudgetPlanDraft(): PlanDraft {
         return { plan: initial, saved: initial, source: storedPlan };
     });
 
-    // Adopt a plan that arrives after the first render, but never over edits.
+    // Adopt a plan that arrives from the server, but never over live edits.
     if (draft.source !== storedPlan && draft.plan === draft.saved) {
         const next = storedPlan ?? createPlan();
 
@@ -125,12 +128,12 @@ export function useBudgetPlanDraft(): PlanDraft {
          */
         update: (next) =>
             setDraft({ ...draft, plan: withSweptRemainders(next) }),
-        save: () => {
-            saveBudgetPlan(draft.plan);
-            setDraft({
-                plan: draft.plan,
-                saved: draft.plan,
-                source: draft.plan,
+        save: (onSuccess) => {
+            const saving = draft.plan;
+
+            saveBudgetPlan(saving, () => {
+                setDraft({ plan: saving, saved: saving, source: saving });
+                onSuccess?.();
             });
         },
     };

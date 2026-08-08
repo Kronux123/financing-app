@@ -5,7 +5,6 @@ namespace App\Http\Controllers;
 use App\Actions\Finance\SaveBudgetPlan;
 use App\Http\Requests\Finance\BudgetPlanUpdateRequest;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -14,15 +13,10 @@ class FinanceController extends Controller
     /**
      * Show the budget plan.
      */
-    public function edit(Request $request): Response
+    public function edit(): Response
     {
-        $plan = $request->user()->budgetPlan()
-            ->with(['paychecks', 'expenseItems'])
-            ->first();
-
-        return Inertia::render('finance/index', [
-            'plan' => $plan,
-        ]);
+        // The plan itself is a shared prop — every page that reads one gets it.
+        return Inertia::render('finance/index');
     }
 
     /**
@@ -32,7 +26,7 @@ class FinanceController extends Controller
         BudgetPlanUpdateRequest $request,
         SaveBudgetPlan $saveBudgetPlan,
     ): RedirectResponse {
-        $saveBudgetPlan->handle($request->user(), $request->validated());
+        $saveBudgetPlan->handle($request->user(), $request->planData());
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Budget plan saved.')]);
 

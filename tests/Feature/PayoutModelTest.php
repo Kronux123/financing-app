@@ -28,8 +28,8 @@ test('a payday cannot be recorded twice', function () {
 test('the same payday on two paychecks is two records', function () {
     $user = User::factory()->create();
 
-    Payout::factory()->for($user)->create(['paid_on' => '2026-07-31', 'paycheck_key' => 'mid_month']);
-    Payout::factory()->for($user)->create(['paid_on' => '2026-07-31', 'paycheck_key' => 'end_month']);
+    Payout::factory()->for($user)->create(['paid_on' => '2026-07-31', 'paycheck_key' => 'mid-month']);
+    Payout::factory()->for($user)->create(['paid_on' => '2026-07-31', 'paycheck_key' => 'end-month']);
 
     expect($user->payouts)->toHaveCount(2);
 });

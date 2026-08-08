@@ -124,10 +124,11 @@ export default function Finance() {
         });
     };
 
-    const handleSave = () => {
-        save();
-        toast.success('Budget plan saved.');
-    };
+    /**
+     * Raised here rather than flashed from the server: the save is a round trip
+     * now, and this is the signal that it landed.
+     */
+    const handleSave = () => save(() => toast.success('Budget plan saved.'));
 
     return (
         <>

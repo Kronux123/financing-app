@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Http\Resources\BudgetPlanResource;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -41,7 +42,29 @@ class HandleInertiaRequests extends Middleware
             'auth' => [
                 'user' => $request->user(),
             ],
+            /**
+             * Shared rather than passed per page. Four pages read the plan, and
+             * every one of them wants the whole of it, so handing it to each
+             * controller separately would only be the same query written out
+             * four times.
+             */
+            'plan' => fn (): ?array => $this->plan($request),
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
         ];
+    }
+
+    /**
+     * Null until a plan is saved, which every page already treats as "nothing
+     * to show yet".
+     */
+    private function plan(Request $request): ?array
+    {
+        $plan = $request->user()?->budgetPlan()
+            ->with(['paychecks', 'expenseItems.paycheck'])
+            ->first();
+
+        // resolve(), not the resource itself: a JsonResource handed to Inertia
+        // arrives wrapped in a `data` key, which is not what the pages read.
+        return $plan === null ? null : (new BudgetPlanResource($plan))->resolve($request);
     }
 }

@@ -30,7 +30,7 @@ class PaycheckFactory extends Factory
     public function midMonth(): static
     {
         return $this->state([
-            'key' => 'mid_month',
+            'key' => 'mid-month',
             'label' => '15th',
             'day_of_month' => 15,
             'position' => 0,
@@ -40,7 +40,7 @@ class PaycheckFactory extends Factory
     public function endMonth(): static
     {
         return $this->state([
-            'key' => 'end_month',
+            'key' => 'end-month',
             'label' => 'End of month',
             'day_of_month' => null,
             'position' => 1,

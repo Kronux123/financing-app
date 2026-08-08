@@ -33,6 +33,7 @@ test('a payable is not debt until it is ticked', function () {
         ->type('@item-name-payables-monthly-0', 'Rent')
         ->type('@item-amount-payables-monthly-0', '12000')
         ->click('@save-plan')
+        ->assertSee('Budget plan saved.')
         ->click('@nav-debt')
         ->assertSeeIn('@debt-empty', 'No payables are ticked as debt')
         ->assertSeeIn('@debt-total', '₱0');
@@ -76,6 +77,7 @@ test('a debt with an end date totals up on the debt page', function () {
         ->type('@item-ends-payables-monthly-0', debtEndDate(12))
         ->click('@item-is-debt-payables-monthly-0')
         ->click('@save-plan')
+        ->assertSee('Budget plan saved.')
         ->click('@nav-debt')
         ->assertSeeIn('@debt-total', '₱30,000')
         ->assertSeeIn('@debt-free', '₱2,500 a month going out')
@@ -137,6 +139,7 @@ test('a start date turns what is left into how far through you are', function ()
         ->assertSeeIn('@item-owed-payables-monthly-0', '₱30,000 left')
         ->assertSeeIn('@item-owed-payables-monthly-0', '8 of 20 paid')
         ->click('@save-plan')
+        ->assertSee('Budget plan saved.')
         ->click('@nav-debt')
         // Borrowed 20 x 2,500, of which 8 x 2,500 is paid and 12 x 2,500 left,
         // so the totals cannot contradict each other.
@@ -172,6 +175,7 @@ test('a debt with no start date shows no progress rather than zero progress', fu
         ->assertSeeIn('@item-owed-payables-monthly-0', '₱30,000 left')
         ->assertDontSee('of 12 paid')
         ->click('@save-plan')
+        ->assertSee('Budget plan saved.')
         ->click('@nav-debt')
         ->assertMissing('@debt-history')
         ->assertSeeIn('@debt-total', '₱30,000');
@@ -186,6 +190,7 @@ test('a debt without an end date admits it knows no total', function () {
         ->type('@item-amount-payables-monthly-0', '1500')
         ->click('@item-is-debt-payables-monthly-0')
         ->click('@save-plan')
+        ->assertSee('Budget plan saved.')
         ->click('@nav-debt')
         ->assertSeeIn('@debt-total', '₱0')
         ->assertSeeIn('@debt-free', 'some debts have no end date yet')
@@ -204,6 +209,7 @@ test('unticking debt drops it from the debt page but keeps the payable', functio
         ->click('@item-is-debt-payables-monthly-0')
         ->assertMissing('@item-owed-payables-monthly-0')
         ->click('@save-plan')
+        ->assertSee('Budget plan saved.')
         ->click('@nav-debt')
         ->assertSeeIn('@debt-empty', 'No payables are ticked as debt');
 
@@ -229,6 +235,7 @@ test('debts total across rows and the slowest one sets the debt-free date', func
         ->type('@item-ends-payables-monthly-1', debtEndDate(6))
         ->click('@item-is-debt-payables-monthly-1')
         ->click('@save-plan')
+        ->assertSee('Budget plan saved.')
         ->click('@nav-debt')
         // 30,000 + 6,000, and 12 months rather than the 6-month debt or a
         // total-over-total average.
@@ -246,6 +253,7 @@ test('the ordering toggle only appears with more than one debt', function () {
         ->type('@item-ends-payables-monthly-0', debtEndDate(12))
         ->click('@item-is-debt-payables-monthly-0')
         ->click('@save-plan')
+        ->assertSee('Budget plan saved.')
         ->click('@nav-debt')
         ->assertMissing('@order-smallest');
 });
@@ -265,6 +273,7 @@ test('smallest first puts the cheapest debt to clear at the top', function () {
         ->type('@item-ends-payables-monthly-1', debtEndDate(6))
         ->click('@item-is-debt-payables-monthly-1')
         ->click('@save-plan')
+        ->assertSee('Budget plan saved.')
         ->click('@nav-debt')
         ->assertPresent('@order-smallest')
         ->assertSeeIn('@debt-row', 'Laptop installment')
@@ -292,6 +301,7 @@ test('the dashboard shows what is really owed once a plan exists', function () {
         ->type('@item-ends-payables-monthly-0', debtEndDate(12))
         ->click('@item-is-debt-payables-monthly-0')
         ->click('@save-plan')
+        ->assertSee('Budget plan saved.')
         ->click('Back to dashboard')
         ->assertPathIs('/dashboard')
         ->assertSee('Outstanding debt')
@@ -305,6 +315,7 @@ test('the dashboard reports nothing owed when no payable is debt', function () {
 
     $page->type('@income-monthly', '40000')
         ->click('@save-plan')
+        ->assertSee('Budget plan saved.')
         ->click('Back to dashboard')
         ->assertSee('Nothing owed')
         ->assertDontSee('₱16,780');
@@ -331,6 +342,7 @@ test('the debt page has no accessibility issues', function () {
         ->click('@item-is-debt-payables-monthly-1')
         ->assertNoAccessibilityIssues()
         ->click('@save-plan')
+        ->assertSee('Budget plan saved.')
         ->click('@nav-debt')
         ->wait(5)
         ->assertNoAccessibilityIssues();
@@ -346,6 +358,7 @@ test('the debt page has no accessibility issues in dark mode', function () {
         ->click('@item-is-debt-payables-monthly-0')
         ->assertNoAccessibilityIssues()
         ->click('@save-plan')
+        ->assertSee('Budget plan saved.')
         ->click('@nav-debt')
         ->wait(5)
         ->assertNoAccessibilityIssues();

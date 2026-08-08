@@ -129,7 +129,8 @@ test('a saved plan survives a reload', function () {
         ->click('@add-payables-mid-month')
         ->type('@item-name-payables-mid-month-0', 'Electricity')
         ->type('@item-amount-payables-mid-month-0', '3200')
-        ->click('@save-plan');
+        ->click('@save-plan')
+        ->assertSee('Budget plan saved.');
 
     // refresh() reloads in the same browser context, so local storage survives.
     // navigate() does not move the page at all here, and a second visit() opens
@@ -181,7 +182,8 @@ test('a payable can carry an end date that survives a reload', function () {
         ->type('@item-name-payables-monthly-0', 'Laptop installment')
         ->type('@item-amount-payables-monthly-0', '2500')
         ->type('@item-ends-payables-monthly-0', '2026-12-31')
-        ->click('@save-plan');
+        ->click('@save-plan')
+        ->assertSee('Budget plan saved.');
 
     $page->refresh()
         ->assertValue('@item-name-payables-monthly-0', 'Laptop installment')
@@ -229,7 +231,8 @@ test('a single figure survives a reload', function () {
 
     $page->type('@income-monthly', '35000')
         ->type('@amount-savings-monthly', '7500')
-        ->click('@save-plan');
+        ->click('@save-plan')
+        ->assertSee('Budget plan saved.');
 
     $page->refresh()
         ->assertValue('@amount-savings-monthly', '7500')
@@ -307,10 +310,40 @@ test('a saved remainder survives a reload', function () {
         ->click('@add-payables-monthly')
         ->type('@item-amount-payables-monthly-0', '5000')
         ->click('@sweep-monthly')
-        ->click('@save-plan');
+        ->click('@save-plan')
+        ->assertSee('Budget plan saved.');
 
     $page->refresh()
         ->assertSeeIn('@remainder-monthly', '₱40,000')
+        ->assertSeeIn('@leftover-monthly', '₱0');
+});
+
+/*
+ * The swept line is derived, never stored — see the expense_items migration.
+ * Storing it made a reloaded plan count its own remainder as already claimed, so
+ * there was nothing left to sweep and the next edit collapsed the figure to
+ * zero. Editing after a reload is what catches it.
+ */
+test('a saved remainder is recomputed rather than carried', function () {
+    $page = visit(route('finance.edit'));
+
+    $page->type('@income-monthly', '45000')
+        ->click('@add-payables-monthly')
+        ->type('@item-amount-payables-monthly-0', '5000')
+        ->click('@sweep-monthly')
+        ->click('@save-plan')
+        ->assertSee('Budget plan saved.');
+
+    // The reloaded plan sweeps what is actually left, not what was left when it
+    // was saved.
+    $page->refresh()
+        ->type('@item-amount-payables-monthly-0', '6000')
+        ->assertSeeIn('@remainder-monthly', '₱39,000')
+        ->click('@save-plan')
+        ->assertSee('Budget plan saved.');
+
+    $page->refresh()
+        ->assertSeeIn('@remainder-monthly', '₱39,000')
         ->assertSeeIn('@leftover-monthly', '₱0');
 });
 
@@ -409,7 +442,8 @@ test('the emergency fund survives a reload', function () {
         ->type('@item-amount-payables-monthly-0', '10000')
         ->click('@cover-6')
         ->type('@fund-balance', '12000')
-        ->click('@save-plan');
+        ->click('@save-plan')
+        ->assertSee('Budget plan saved.');
 
     $page->refresh()
         ->assertValue('@fund-balance', '12000')
@@ -422,7 +456,8 @@ test('the pot balance is kept alongside the fund', function () {
     $page->type('@income-monthly', '30000')
         ->type('@fund-balance', '12000')
         ->type('@pot-balance', '8000')
-        ->click('@save-plan');
+        ->click('@save-plan')
+        ->assertSee('Budget plan saved.');
 
     $page->refresh()
         ->assertValue('@fund-balance', '12000')
@@ -438,7 +473,8 @@ test('the dashboard leads with total saved and gives the fund its own card', fun
         ->type('@amount-savings-monthly', '5000')
         ->type('@fund-balance', '12000')
         ->type('@pot-balance', '8000')
-        ->click('@save-plan');
+        ->click('@save-plan')
+        ->assertSee('Budget plan saved.');
 
     $page->click('Back to dashboard')
         ->assertPathIs('/dashboard')
@@ -470,7 +506,8 @@ test('the dashboard reflects a saved plan', function () {
         ->type('@item-name-payables-monthly-0', 'Rent')
         ->type('@item-amount-payables-monthly-0', '15000')
         ->type('@amount-savings-monthly', '10000')
-        ->click('@save-plan');
+        ->click('@save-plan')
+        ->assertSee('Budget plan saved.');
 
     $page->click('Back to dashboard')
         ->assertPathIs('/dashboard')

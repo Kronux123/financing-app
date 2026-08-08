@@ -10,8 +10,8 @@ use Illuminate\Validation\Rule;
 trait BudgetPlanValidationRules
 {
     /**
-     * The plan arrives as a whole document, so these rules describe the whole
-     * of it rather than one field at a time.
+     * The plan arrives in the same shape it was sent out in — see
+     * BudgetPlanResource, which is the other half of this contract.
      *
      * @param  BudgetPlan|null  $plan  The plan being replaced, if there is one.
      *                                 Row ids are checked against it so an id
@@ -23,18 +23,24 @@ trait BudgetPlanValidationRules
     {
         return [
             'cadence' => ['required', Rule::enum(PayCadence::class)],
-            'months_of_cover' => ['required', 'integer', 'min:1', 'max:24'],
-            'emergency_fund_balance' => ['required', ...$this->amountRules()],
-            'savings_pot_balance' => ['required', ...$this->amountRules()],
+            'emergencyFund.monthsOfCover' => ['required', 'integer', 'min:1', 'max:24'],
+            'emergencyFund.balance' => ['required', ...$this->amountRules()],
+            'savingsPot.balance' => ['required', ...$this->amountRules()],
 
             'paychecks' => ['required', 'array', 'min:1', 'max:2'],
-            'paychecks.*.key' => ['required', 'string', 'max:20', 'distinct'],
+            'paychecks.*.id' => ['required', 'string', 'max:20', 'distinct'],
             'paychecks.*.label' => ['required', 'string', 'max:255'],
-            'paychecks.*.day_of_month' => ['nullable', 'integer', 'min:1', 'max:31'],
+            /** Null once `last` has been normalised — the day that varies. */
+            'paychecks.*.dayOfMonth' => ['nullable', 'integer', 'min:1', 'max:31'],
             'paychecks.*.amount' => ['required', ...$this->amountRules()],
-            'paychecks.*.saves_remainder' => ['required', 'boolean'],
+            /** Optional on the page's type, so an absent key means false. */
+            'paychecks.*.savesRemainder' => ['nullable', 'boolean'],
 
             'items' => ['present', 'array', 'max:200'],
+            /**
+             * Null for a row added on the page and not yet saved. A number has
+             * to be a row of yours.
+             */
             'items.*.id' => [
                 'nullable',
                 'integer',
@@ -43,25 +49,24 @@ trait BudgetPlanValidationRules
                     $plan?->id ?? 0,
                 ),
             ],
-            /** Items point at a paycheck by key: the client has no ids for new ones. */
-            'items.*.paycheck_key' => ['required', 'string', 'in_array:paychecks.*.key'],
+            'items.*.paycheckId' => ['required', 'string', 'in_array:paychecks.*.id'],
             'items.*.group' => ['required', Rule::enum(ExpenseGroup::class)],
             'items.*.name' => ['nullable', 'string', 'max:255'],
             'items.*.amount' => ['required', ...$this->amountRules()],
-            'items.*.started_on' => ['nullable', 'date'],
-            'items.*.ends_on' => ['nullable', 'date', 'after_or_equal:items.*.started_on'],
-            'items.*.is_debt' => ['required', 'boolean'],
+            'items.*.startedOn' => ['nullable', 'date'],
+            'items.*.endsOn' => ['nullable', 'date', 'after_or_equal:items.*.startedOn'],
+            'items.*.isDebt' => ['nullable', 'boolean'],
         ];
     }
 
     /**
-     * Money is centavos, so every figure is a whole number. The ceiling keeps a
-     * typo well inside the unsigned bigint the column holds.
+     * Pesos on the wire, and they may carry centavos. The ceiling keeps a typo
+     * well inside the column that holds it once multiplied up.
      *
      * @return array<int, string>
      */
     private function amountRules(): array
     {
-        return ['integer', 'min:0', 'max:999999999999'];
+        return ['numeric', 'min:0', 'max:9999999999'];
     }
 }

@@ -52,7 +52,7 @@ test('a payday later this month is not opened early', function () {
     $plan->forceFill(['created_at' => '2026-03-01'])->save();
 
     Paycheck::factory()->for($plan)->create([
-        'key' => 'mid_month',
+        'key' => 'mid-month',
         'day_of_month' => 15,
     ]);
 

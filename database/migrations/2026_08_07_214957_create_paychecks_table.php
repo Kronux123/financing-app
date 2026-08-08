@@ -17,7 +17,7 @@ return new class extends Migration
 
             /**
              * Payouts snapshot this string rather than holding a foreign key,
-             * so it has to stay stable: `monthly`, `mid_month`, `end_month`.
+             * so it has to stay stable: `monthly`, `mid-month`, `end-month`.
              */
             $table->string('key', 20);
             $table->string('label');

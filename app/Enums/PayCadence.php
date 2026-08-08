@@ -5,7 +5,7 @@ namespace App\Enums;
 enum PayCadence: string
 {
     case Monthly = 'monthly';
-    case SemiMonthly = 'semi_monthly';
+    case SemiMonthly = 'semi-monthly';
 
     /**
      * The paychecks this cadence implies, in the order they are paid.
@@ -22,8 +22,8 @@ enum PayCadence: string
                 ['key' => 'monthly', 'label' => 'Monthly pay', 'day_of_month' => null],
             ],
             self::SemiMonthly => [
-                ['key' => 'mid_month', 'label' => '15th', 'day_of_month' => 15],
-                ['key' => 'end_month', 'label' => 'End of month', 'day_of_month' => null],
+                ['key' => 'mid-month', 'label' => '15th', 'day_of_month' => 15],
+                ['key' => 'end-month', 'label' => 'End of month', 'day_of_month' => null],
             ],
         };
     }
