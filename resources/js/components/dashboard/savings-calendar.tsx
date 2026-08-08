@@ -87,7 +87,12 @@ export function SavingsCalendar({
                             className={cn('size-2.5 rounded-full', tier.mark)}
                         />
                         {tier.label}
-                        <span className="text-muted-foreground/70">
+                        {/*
+                         * Full muted-foreground, not a fraction of it. At 12px
+                         * the /70 step came out at 2.71:1 on the card and 4.17:1
+                         * in dark — both under the floor.
+                         */}
+                        <span className="text-muted-foreground">
                             {tier.range}
                         </span>
                     </li>
@@ -147,7 +152,13 @@ export function SavingsCalendar({
                                     />
                                     {label}
                                 </p>
-                                <p className="text-xs text-muted-foreground tabular-nums">
+                                {/*
+                                 * The cell carries a goal tint, and
+                                 * muted-foreground on it lands at 4.25:1. The
+                                 * payouts page settled on foreground/70 over the
+                                 * same tints.
+                                 */}
+                                <p className="text-xs text-foreground/70 tabular-nums">
                                     {Math.round(share * 100)}%
                                 </p>
                             </div>
@@ -156,7 +167,7 @@ export function SavingsCalendar({
                                 {formatAmount(amount)}
                             </p>
 
-                            <p className="mt-0.5 text-xs text-muted-foreground tabular-nums">
+                            <p className="mt-0.5 text-xs text-foreground/70 tabular-nums">
                                 {delta >= 0 ? '+' : '−'}
                                 {formatAmount(delta)} vs goal
                             </p>

@@ -8,3 +8,4 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Http/** | .ai/rules/http.md |
 | resources/js/**/*.tsx, resources/js/** | .ai/rules/js.md |
 | app/Http/Resources/** | .ai/rules/resources.md |
+| app/Actions/Payouts/**, resources/js/lib/savings.ts, resources/js/pages/months/** | .ai/rules/savings.md |

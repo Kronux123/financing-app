@@ -16,6 +16,7 @@ import { SavingsChart } from '@/components/dashboard/savings-chart';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useStoredBudgetPlan } from '@/hooks/use-budget-plan';
+import { useSavingsHistory } from '@/hooks/use-savings';
 import type { BudgetPlan, FreeingUp } from '@/lib/budget';
 import {
     freeingUpWithin,
@@ -28,6 +29,7 @@ import {
     totalSaved as planTotalSaved,
 } from '@/lib/budget';
 import { formatPeso, formatSigned } from '@/lib/currency';
+import { lastMonths, monthShortLabel } from '@/lib/savings';
 import { dashboard } from '@/routes';
 import dashboardRoutes from '@/routes/dashboard';
 import { edit as financeRoute } from '@/routes/finance';
@@ -49,13 +51,8 @@ const sampleSupportingStats = [
     { label: 'Emergency buffer', value: 18_200 },
 ];
 
-const monthlySavings = [
-    { month: 'Nov', amount: 5_200 },
-    { month: 'Dec', amount: 6_100 },
-    { month: 'Jan', amount: 6_450 },
-    { month: 'Feb', amount: 5_980 },
-    { month: 'Mar', amount: 6_120 },
-];
+/** How much history the chart shows. Enough to read a trend, few enough to fit. */
+const chartMonths = 6;
 
 const sampleOutstandingDebt = -16_780;
 
@@ -178,7 +175,12 @@ const deriveFigures = (
     const freeingUp = freeingUpWithin(plan, cashflowWindowMonths, today);
 
     return {
-        monthlyGoal: plannedSavings > 0 ? plannedSavings : sampleMonthlyGoal,
+        /**
+         * What the plan intends to put by each month, swept remainder included.
+         * No sample fallback once there is a plan: the goal line sits against
+         * real history now, and a made-up target would misread every bar.
+         */
+        monthlyGoal: plannedSavings,
         monthlyExpenses: -(allocated - plannedSavings),
         projectedCashflow: freeingUp.amount,
         cashflowNote: cashflowNoteFor(freeingUp),
@@ -229,7 +231,13 @@ const fundNote = ({ target, gap, monthsToFill }: FundFigures): string => {
 
 export default function Dashboard() {
     const plan = useStoredBudgetPlan();
+    const history = useSavingsHistory();
     const hasPlan = plan !== null && isPlanPopulated(plan);
+    /** Real months, however few — a finalized payday is the only source. */
+    const chartData = lastMonths(history, chartMonths).map((entry) => ({
+        month: monthShortLabel(entry.month),
+        amount: entry.saved,
+    }));
     const {
         monthlyGoal,
         monthlyExpenses,
@@ -277,7 +285,12 @@ export default function Dashboard() {
                     <h1 className="text-2xl font-semibold tracking-tight">
                         Savings overview
                     </h1>
-                    <p className="text-sm text-muted-foreground">March 2026</p>
+                    <p className="text-sm text-muted-foreground">
+                        {new Date().toLocaleDateString('en-US', {
+                            month: 'long',
+                            year: 'numeric',
+                        })}
+                    </p>
                 </header>
 
                 {!hasPlan && (
@@ -442,11 +455,21 @@ export default function Dashboard() {
                             </Button>
                         </CardHeader>
                         <CardContent>
-                            <SavingsChart
-                                data={monthlySavings}
-                                goal={monthlyGoal}
-                                formatAmount={formatPeso}
-                            />
+                            {chartData.length > 0 ? (
+                                <SavingsChart
+                                    data={chartData}
+                                    goal={monthlyGoal}
+                                    formatAmount={formatPeso}
+                                />
+                            ) : (
+                                <p
+                                    data-test="savings-empty"
+                                    className="py-10 text-sm text-muted-foreground"
+                                >
+                                    No month has been settled yet. Finalize a
+                                    payday on the payouts page and it lands here.
+                                </p>
+                            )}
                         </CardContent>
                     </Card>
 

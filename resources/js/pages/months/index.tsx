@@ -4,93 +4,65 @@ import { useState } from 'react';
 import { SavingsCalendar } from '@/components/dashboard/savings-calendar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { useStoredBudgetPlan } from '@/hooks/use-budget-plan';
+import { useSavingsHistory } from '@/hooks/use-savings';
+import { savingsPerMonth } from '@/lib/budget';
 import { formatPeso } from '@/lib/currency';
+import { monthsForYear, summariseYear, yearsIn } from '@/lib/savings';
 import { dashboard } from '@/routes';
-
-const monthlyGoal = 7_200;
-
-const currentYear = 2026;
-const currentMonth = 2;
-
-const monthLabels = [
-    'January',
-    'February',
-    'March',
-    'April',
-    'May',
-    'June',
-    'July',
-    'August',
-    'September',
-    'October',
-    'November',
-    'December',
-];
-
-const savingsByYear: Record<number, (number | null)[]> = {
-    2026: [6_450, 5_980, 6_120, ...Array<null>(9).fill(null)],
-    2025: [
-        5_890, 5_720, 6_050, 6_250, 5_980, 6_140, 6_380, 5_860, 7_350, 6_020,
-        5_200, 6_100,
-    ],
-    2024: [
-        4_820, 5_010, 4_760, 5_240, 5_130, 5_480, 5_320, 5_610, 5_490, 5_750,
-        5_880, 6_300,
-    ],
-};
-
-const years = Object.keys(savingsByYear)
-    .map(Number)
-    .sort((a, b) => a - b);
-
-const earliestYear = years[0];
-const latestYear = years[years.length - 1];
+import { index as payoutsRoute } from '@/routes/payouts';
 
 export default function DashboardMonths() {
-    const [year, setYear] = useState(currentYear);
+    const history = useSavingsHistory();
+    const plan = useStoredBudgetPlan();
 
-    const months = savingsByYear[year];
-    const recorded = months
-        .map((amount, index) => ({ amount, index }))
-        .filter(
-            (entry): entry is { amount: number; index: number } =>
-                entry.amount !== null,
-        );
+    /**
+     * The goal is what the plan intends to save each month, swept remainder
+     * included — the same figure the months are measured against on the
+     * dashboard. Zero without a plan, which the calendar reads as "no goal" and
+     * shades nothing against.
+     */
+    const goal = plan ? savingsPerMonth(plan) : 0;
 
-    const total = recorded.reduce((sum, entry) => sum + entry.amount, 0);
-    const average = recorded.length > 0 ? total / recorded.length : 0;
-    const best = recorded.reduce(
-        (a, b) => (b.amount > a.amount ? b : a),
-        recorded[0],
+    const today = new Date();
+    const years = yearsIn(history);
+    /**
+     * Opens on the most recent year that has anything in it. A year with no
+     * finalized payday is not offered, so the arrows only ever walk between
+     * years that hold something.
+     */
+    const latestYear = years[years.length - 1] ?? today.getFullYear();
+    const earliestYear = years[0] ?? today.getFullYear();
+    const [year, setYear] = useState(latestYear);
+
+    const months = monthsForYear(history, year);
+    const { recorded, total, average, best, worst, goalsMet } = summariseYear(
+        months,
+        goal,
     );
-    const worst = recorded.reduce(
-        (a, b) => (b.amount < a.amount ? b : a),
-        recorded[0],
-    );
-    const goalsMet = recorded.filter(
-        (entry) => entry.amount >= monthlyGoal,
-    ).length;
-    const averageShare = monthlyGoal > 0 ? average / monthlyGoal : 0;
 
     const summary = [
         {
             label: 'Best month',
-            value: formatPeso(best.amount),
-            note: monthLabels[best.index],
+            value: best ? formatPeso(best.amount) : '—',
+            note: best ? best.label : 'Nothing settled yet',
         },
         {
             label: 'Lowest month',
-            value: formatPeso(worst.amount),
-            note: monthLabels[worst.index],
+            value: worst ? formatPeso(worst.amount) : '—',
+            note: worst ? worst.label : 'Nothing settled yet',
         },
         {
             label: 'Monthly average',
-            value: formatPeso(Math.round(average)),
-            note: `${Math.round(averageShare * 100)}% of the ${formatPeso(monthlyGoal)} goal`,
+            value: recorded > 0 ? formatPeso(Math.round(average)) : '—',
+            note:
+                goal > 0 && recorded > 0
+                    ? `${Math.round((average / goal) * 100)}% of the ${formatPeso(goal)} goal`
+                    : 'No goal set on the plan',
         },
         {
             label: 'Months at goal',
-            value: `${goalsMet} of ${recorded.length}`,
+            value: `${goalsMet} of ${recorded}`,
             note: 'Hit the full monthly target',
         },
     ];
@@ -106,9 +78,9 @@ export default function DashboardMonths() {
                             Savings calendar
                         </h1>
                         <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-                            Every month of the year side by side, shaded by how
-                            close it came to the {formatPeso(monthlyGoal)}{' '}
-                            monthly goal.
+                            {goal > 0
+                                ? `Every month of the year side by side, shaded by how close it came to the ${formatPeso(goal)} monthly goal.`
+                                : 'Every month of the year side by side. Set a savings figure on your plan to shade them against a goal.'}
                         </p>
                     </div>
                     <Button asChild variant="outline" size="sm">
@@ -116,78 +88,112 @@ export default function DashboardMonths() {
                     </Button>
                 </header>
 
-                <Card>
-                    <CardHeader className="flex flex-wrap items-center justify-between gap-4">
-                        <div className="flex items-center gap-1">
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                aria-label={`Show ${year - 1}`}
-                                disabled={year <= earliestYear}
-                                onClick={() => setYear(year - 1)}
-                            >
-                                <ChevronLeft />
-                            </Button>
+                {history.length === 0 ? (
+                    <Card>
+                        <CardContent className="p-6">
                             <p
-                                aria-live="polite"
-                                className="min-w-16 text-center text-lg font-semibold tabular-nums"
+                                data-test="calendar-empty"
+                                className="text-sm text-muted-foreground"
                             >
-                                {year}
+                                No month has been settled yet. Finalize a payday
+                                on the{' '}
+                                <Link
+                                    href={payoutsRoute()}
+                                    className="underline underline-offset-4"
+                                >
+                                    payouts page
+                                </Link>{' '}
+                                and the month it belongs to fills in here.
                             </p>
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                aria-label={`Show ${year + 1}`}
-                                disabled={year >= latestYear}
-                                onClick={() => setYear(year + 1)}
-                            >
-                                <ChevronRight />
-                            </Button>
-                        </div>
+                        </CardContent>
+                    </Card>
+                ) : (
+                    <Card>
+                        <CardHeader className="flex flex-wrap items-center justify-between gap-4">
+                            <div className="flex items-center gap-1">
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    aria-label={`Show ${year - 1}`}
+                                    disabled={year <= earliestYear}
+                                    onClick={() => setYear(year - 1)}
+                                >
+                                    <ChevronLeft />
+                                </Button>
+                                <p
+                                    aria-live="polite"
+                                    data-test="calendar-year"
+                                    className="min-w-16 text-center text-lg font-semibold tabular-nums"
+                                >
+                                    {year}
+                                </p>
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    aria-label={`Show ${year + 1}`}
+                                    disabled={year >= latestYear}
+                                    onClick={() => setYear(year + 1)}
+                                >
+                                    <ChevronRight />
+                                </Button>
+                            </div>
 
-                        <div className="text-right">
-                            <p className="text-sm text-muted-foreground">
-                                Saved in {year}
-                            </p>
-                            <p className="text-xl font-semibold tabular-nums">
-                                {formatPeso(total)}
-                                <span className="ml-2 text-sm font-normal text-muted-foreground">
-                                    across {recorded.length}{' '}
-                                    {recorded.length === 1 ? 'month' : 'months'}
-                                </span>
-                            </p>
-                        </div>
-                    </CardHeader>
+                            <div className="text-right">
+                                <p className="text-sm text-muted-foreground">
+                                    Saved in {year}
+                                </p>
+                                <p
+                                    data-test="calendar-total"
+                                    className="text-xl font-semibold tabular-nums"
+                                >
+                                    {formatPeso(total)}
+                                    <span className="ml-2 text-sm font-normal text-muted-foreground">
+                                        across {recorded}{' '}
+                                        {recorded === 1 ? 'month' : 'months'}
+                                    </span>
+                                </p>
+                            </div>
+                        </CardHeader>
 
-                    <CardContent className="pt-0">
-                        <SavingsCalendar
-                            months={months}
-                            goal={monthlyGoal}
-                            formatAmount={formatPeso}
-                            currentMonth={
-                                year === currentYear ? currentMonth : undefined
-                            }
-                        />
-                    </CardContent>
-                </Card>
+                        <CardContent className="pt-0">
+                            <SavingsCalendar
+                                months={months}
+                                goal={goal}
+                                formatAmount={formatPeso}
+                                currentMonth={
+                                    year === today.getFullYear()
+                                        ? today.getMonth()
+                                        : undefined
+                                }
+                            />
+                        </CardContent>
+                    </Card>
+                )}
 
-                <dl className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                {/*
+                 * Each tile owns its own <dl>, as on the dashboard. One list
+                 * wrapping the cards put two divs between the list and its
+                 * terms, which is not a shape a description list may take.
+                 */}
+                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                     {summary.map((item) => (
                         <Card key={item.label}>
                             <CardContent className="p-5">
-                                <dt className="text-sm text-muted-foreground">
-                                    {item.label}
-                                </dt>
-                                <dd className="mt-1 text-2xl font-semibold tabular-nums">
-                                    {item.value}
-                                </dd>
+                                <dl>
+                                    <dt className="text-sm text-muted-foreground">
+                                        {item.label}
+                                    </dt>
+                                    <dd className="mt-1 text-2xl font-semibold tabular-nums">
+                                        {item.value}
+                                    </dd>
+                                </dl>
                                 <p className="mt-1 text-xs text-muted-foreground">
                                     {item.note}
                                 </p>
                             </CardContent>
                         </Card>
                     ))}
-                </dl>
+                </div>
             </div>
         </>
     );

@@ -9,27 +9,36 @@ type SavingsChartProps = {
     formatAmount: (value: number) => string;
 };
 
+/** Callers render an empty state instead; this draws at least one bar. */
 export function SavingsChart({ data, goal, formatAmount }: SavingsChartProps) {
     const peak = Math.max(...data.map((point) => point.amount));
     const best = data.reduce((a, b) => (b.amount > a.amount ? b : a));
-    const scaleMax = Math.max(goal, peak) * 1.08;
+    /** Never zero, or every bar divides by it — a flat month still draws. */
+    const scaleMax = Math.max(goal, peak, 1) * 1.08;
 
     return (
         <figure className="space-y-2">
             <div className="relative h-44">
-                <div
-                    aria-hidden
-                    className="absolute inset-x-0 border-t border-dashed border-border"
-                    style={{ bottom: `${(goal / scaleMax) * 100}%` }}
-                >
-                    <span className="absolute -top-2.5 right-0 bg-card pl-2 text-xs text-muted-foreground tabular-nums">
-                        Goal {formatAmount(goal)}
-                    </span>
-                </div>
+                {/* A plan saving nothing has no goal worth drawing a line at. */}
+                {goal > 0 && (
+                    <div
+                        aria-hidden
+                        className="absolute inset-x-0 border-t border-dashed border-border"
+                        style={{ bottom: `${(goal / scaleMax) * 100}%` }}
+                    >
+                        <span className="absolute -top-2.5 right-0 bg-card pl-2 text-xs text-muted-foreground tabular-nums">
+                            Goal {formatAmount(goal)}
+                        </span>
+                    </div>
+                )}
 
                 <div
                     role="group"
-                    aria-label={`Monthly savings for the last five months, against a ${formatAmount(goal)} monthly goal`}
+                    aria-label={
+                        goal > 0
+                            ? `Monthly savings over ${data.length} ${data.length === 1 ? 'month' : 'months'}, against a ${formatAmount(goal)} monthly goal`
+                            : `Monthly savings over ${data.length} ${data.length === 1 ? 'month' : 'months'}`
+                    }
                     className="flex h-full items-end gap-1"
                 >
                     {data.map((point) => {
@@ -48,10 +57,12 @@ export function SavingsChart({ data, goal, formatAmount }: SavingsChartProps) {
                                 >
                                     <span className="rounded-md border border-border bg-popover px-2 py-1 text-xs whitespace-nowrap text-popover-foreground tabular-nums shadow-sm">
                                         {formatAmount(point.amount)}
-                                        <span className="text-muted-foreground">
-                                            {' · '}
-                                            {Math.round(share)}% of goal
-                                        </span>
+                                        {goal > 0 && (
+                                            <span className="text-muted-foreground">
+                                                {' · '}
+                                                {Math.round(share)}% of goal
+                                            </span>
+                                        )}
                                     </span>
                                 </div>
 
@@ -69,7 +80,11 @@ export function SavingsChart({ data, goal, formatAmount }: SavingsChartProps) {
                                 <div
                                     role="img"
                                     tabIndex={0}
-                                    aria-label={`${point.month}: ${formatAmount(point.amount)}, ${Math.round(share)} percent of monthly goal`}
+                                    aria-label={
+                                        goal > 0
+                                            ? `${point.month}: ${formatAmount(point.amount)}, ${Math.round(share)} percent of monthly goal`
+                                            : `${point.month}: ${formatAmount(point.amount)}`
+                                    }
                                     style={{
                                         height: `${Math.max(height, 2)}%`,
                                     }}
