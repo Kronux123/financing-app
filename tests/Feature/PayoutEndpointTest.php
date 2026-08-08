@@ -31,9 +31,12 @@ function payoutFor(User $user, ?string $paidOn = null): Payout
 }
 
 /**
+ * The correction as the page sends it: pesos, and named the way the page reads
+ * them. PayoutResource is the other half of this shape.
+ *
  * @return array<string, mixed>
  */
-function payoutPayload(Payout $payout, int $income = 2_500_000, int $rent = 900_000): array
+function payoutPayload(Payout $payout, float|int $income = 25_000, float|int $rent = 9_000): array
 {
     return [
         'incomes' => [[
@@ -61,7 +64,7 @@ test('guests are turned away', function () {
 
 test('the page lists your paydays with their figures', function () {
     $user = User::factory()->create();
-    payoutFor($user);
+    $payout = payoutFor($user, '2026-07-31');
 
     $this->actingAs($user)
         ->get(route('payouts.index'))
@@ -70,8 +73,57 @@ test('the page lists your paydays with their figures', function () {
             fn (AssertableInertia $page) => $page
                 ->component('payouts/index')
                 ->has('payouts', 1)
-                ->has('payouts.0.incomes', 1)
-                ->has('payouts.0.lines', 1)
+                ->where('payouts.0.id', $payout->id)
+                // Stable across reloads, and safe to build a selector from.
+                ->where('payouts.0.key', '2026-07-monthly')
+                ->where('payouts.0.paycheckId', 'monthly')
+                ->where('payouts.0.paycheckLabel', 'Monthly pay')
+                ->where('payouts.0.paidOn', '2026-07-31')
+                ->where('payouts.0.status', 'pending')
+                // Pesos on the wire, centavos in the column behind it.
+                ->where('payouts.0.incomes.0.planned', 25_000)
+                ->where('payouts.0.incomes.0.actual', 25_000)
+                ->where('payouts.0.incomes.0.source', 'paycheck')
+                ->where('payouts.0.lines.0.groupId', 'payables')
+                ->where('payouts.0.lines.0.name', 'Rent')
+                ->where('payouts.0.lines.0.planned', 9_000)
+        );
+});
+
+// Newest first: the payday you came to settle is the one at the top.
+test('paydays are listed newest first', function () {
+    $user = User::factory()->create();
+    payoutFor($user, '2026-06-30');
+    payoutFor($user, '2026-07-31');
+
+    $this->actingAs($user)
+        ->get(route('payouts.index'))
+        ->assertOk()
+        ->assertInertia(
+            fn (AssertableInertia $page) => $page
+                ->where('payouts.0.paidOn', '2026-07-31')
+                ->where('payouts.1.paidOn', '2026-06-30')
+                ->etc()
+        );
+});
+
+// A hundredfold error in somebody's budget is what a missed conversion costs.
+test('centavos survive the round trip', function () {
+    $user = User::factory()->create();
+    $payout = payoutFor($user);
+
+    $this->actingAs($user)
+        ->put(route('payouts.update', $payout), payoutPayload($payout, rent: 9_000.07))
+        ->assertSessionHasNoErrors();
+
+    expect($payout->lines()->first()->actual)->toBe(900_007);
+
+    $this->actingAs($user)
+        ->get(route('payouts.index'))
+        ->assertInertia(
+            fn (AssertableInertia $page) => $page
+                ->where('payouts.0.lines.0.actual', 9_000.07)
+                ->etc()
         );
 });
 
@@ -91,7 +143,7 @@ test('correcting what came in records the actuals', function () {
     $payout = payoutFor($user);
 
     $this->actingAs($user)
-        ->put(route('payouts.update', $payout), payoutPayload($payout, income: 2_480_000, rent: 920_000))
+        ->put(route('payouts.update', $payout), payoutPayload($payout, income: 24_800, rent: 9_200))
         ->assertSessionHasNoErrors()
         ->assertRedirect(route('payouts.index'));
 
@@ -113,7 +165,7 @@ test('a line added while reviewing is unplanned spending', function () {
         'id' => null,
         'group' => ExpenseGroup::Payables->value,
         'name' => 'Hospital visit',
-        'actual' => 200_000,
+        'actual' => 2_000,
     ];
 
     $this->actingAs($user)->put(route('payouts.update', $payout), $payload)
@@ -136,7 +188,7 @@ test('13th month pay is added as income nobody forecast', function () {
         'id' => null,
         'source' => IncomeSource::ThirteenthMonth->value,
         'label' => '13th month',
-        'actual' => 2_500_000,
+        'actual' => 25_000,
     ];
 
     $this->actingAs($user)->put(route('payouts.update', $payout), $payload)
@@ -191,7 +243,7 @@ test('a finalized payday refuses corrections until it is reopened', function () 
     $this->actingAs($user)->patch(route('payouts.status', $payout), ['status' => 'finalized']);
 
     $this->actingAs($user)
-        ->put(route('payouts.update', $payout), payoutPayload($payout, rent: 999_999))
+        ->put(route('payouts.update', $payout), payoutPayload($payout, rent: 9_999.99))
         ->assertSessionHasErrors('status');
 
     expect($payout->lines()->first()->actual)->toBe(900_000);
@@ -199,7 +251,7 @@ test('a finalized payday refuses corrections until it is reopened', function () 
     $this->actingAs($user)->patch(route('payouts.status', $payout), ['status' => 'pending']);
 
     $this->actingAs($user)
-        ->put(route('payouts.update', $payout), payoutPayload($payout, rent: 999_999))
+        ->put(route('payouts.update', $payout), payoutPayload($payout, rent: 9_999.99))
         ->assertSessionHasNoErrors();
 
     expect($payout->lines()->first()->actual)->toBe(999_999);

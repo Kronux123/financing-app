@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Payouts;
 
+use App\Concerns\ConvertsMoney;
 use App\Enums\ExpenseGroup;
 use App\Enums\IncomeSource;
 use Illuminate\Foundation\Http\FormRequest;
@@ -9,6 +10,8 @@ use Illuminate\Validation\Rule;
 
 class PayoutUpdateRequest extends FormRequest
 {
+    use ConvertsMoney;
+
     /**
      * A payout is corrected as one document, the way it is reviewed.
      *
@@ -47,10 +50,42 @@ class PayoutUpdateRequest extends FormRequest
     }
 
     /**
+     * The record as the action wants it: centavos, and named for the columns.
+     *
+     * `planned` never appears, on the way in or out of here. It is what the plan
+     * said when the payday was opened, and a record of the forecast is worth
+     * nothing if the forecast can be edited afterwards.
+     *
+     * @return array<string, mixed>
+     */
+    public function payoutData(): array
+    {
+        $data = $this->validated();
+
+        return [
+            'incomes' => array_map(fn (array $income): array => [
+                'id' => $income['id'] ?? null,
+                'source' => $income['source'],
+                'label' => $income['label'],
+                'actual' => $this->toCentavos($income['actual']),
+            ], $data['incomes']),
+            'lines' => array_map(fn (array $line): array => [
+                'id' => $line['id'] ?? null,
+                'group' => $line['group'],
+                'name' => $line['name'],
+                'actual' => $this->toCentavos($line['actual']),
+            ], $data['lines']),
+        ];
+    }
+
+    /**
+     * Pesos on the wire, and they may carry centavos. Matches the plan's rules,
+     * because the same input control types both figures.
+     *
      * @return array<int, string>
      */
     private function amountRules(): array
     {
-        return ['integer', 'min:0', 'max:999999999999'];
+        return ['numeric', 'min:0', 'max:9999999999'];
     }
 }

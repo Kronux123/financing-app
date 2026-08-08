@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Actions\Payouts\SavePayout;
 use App\Http\Requests\Payouts\PayoutUpdateRequest;
+use App\Http\Resources\PayoutResource;
 use App\Models\Payout;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -16,13 +17,22 @@ class PayoutController extends Controller
 {
     /**
      * Show every payday that has been, newest first.
+     *
+     * Only records that exist: the daily `payouts:open` command is what creates
+     * them, so this reads the ledger rather than working out what should be in
+     * it. Nothing is derived here, and nothing is opened by looking.
      */
     public function index(Request $request): Response
     {
+        $payouts = $request->user()->payouts()
+            ->with(['incomes', 'lines'])
+            ->orderByDesc('paid_on')
+            ->get();
+
         return Inertia::render('payouts/index', [
-            'payouts' => $request->user()->payouts()
-                ->with(['incomes', 'lines'])
-                ->get(),
+            // resolve(), not the collection itself: a resource handed to Inertia
+            // arrives wrapped in a `data` key, which is not what the page reads.
+            'payouts' => PayoutResource::collection($payouts)->resolve($request),
         ]);
     }
 
@@ -46,7 +56,7 @@ class PayoutController extends Controller
             ]);
         }
 
-        $savePayout->handle($payout, $request->validated());
+        $savePayout->handle($payout, $request->payoutData());
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Payday updated.')]);
 

@@ -6,18 +6,19 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { useStoredBudgetPlan } from '@/hooks/use-budget-plan';
-import { savePayout, useStoredPayouts } from '@/hooks/use-payouts';
+import {
+    setPayoutStatus,
+    usePayoutDraft,
+    useStoredPayouts,
+} from '@/hooks/use-payouts';
 import { formatPeso, formatSigned } from '@/lib/currency';
 import type { Payout } from '@/lib/payout';
 import {
-    duePayouts,
     incomeVariance,
     isFinalized,
     leftOver,
-    mergePayouts,
     withActualIncome,
     withActualLine,
-    withStatus,
 } from '@/lib/payout';
 import { cn } from '@/lib/utils';
 import { dashboard } from '@/routes';
@@ -95,7 +96,7 @@ function Delta({
 function StatusDot({ payout }: { payout: Payout }) {
     return (
         <span
-            data-test={`payout-status-${payout.id}`}
+            data-test={`payout-status-${payout.key}`}
             className="flex items-center gap-1.5 text-xs whitespace-nowrap text-muted-foreground"
         >
             <span
@@ -114,7 +115,7 @@ function PayoutRow({ payout, onOpen }: { payout: Payout; onOpen: () => void }) {
     return (
         <button
             type="button"
-            data-test={`payout-row-${payout.id}`}
+            data-test={`payout-row-${payout.key}`}
             onClick={onOpen}
             className="flex w-full flex-wrap items-center gap-x-4 gap-y-1 rounded-lg px-4 py-3 text-left transition-colors hover:bg-muted focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
         >
@@ -139,10 +140,31 @@ function PayoutRow({ payout, onOpen }: { payout: Payout; onOpen: () => void }) {
     );
 }
 
-function PayoutDetail({ payout }: { payout: Payout }) {
+/**
+ * One payday, open for review.
+ *
+ * Corrections are held in a draft rather than sent as they are typed: a payday
+ * is reviewed as one document, and every keystroke in an amount field would
+ * otherwise be a write. Finalizing a card with corrections still in it saves
+ * them first, so the button never quietly throws work away.
+ */
+function PayoutDetail({ payout: stored }: { payout: Payout }) {
+    const { payout, isDirty, update, save } = usePayoutDraft(stored);
     const finalized = isFinalized(payout);
     const left = leftOver(payout);
     const over = left < 0;
+
+    const toggleStatus = () => {
+        const next = finalized ? 'pending' : 'finalized';
+
+        if (isDirty) {
+            save(() => setPayoutStatus(payout, next));
+
+            return;
+        }
+
+        setPayoutStatus(payout, next);
+    };
 
     return (
         <Card data-test="payout-card" className="gap-0 overflow-hidden py-0">
@@ -162,30 +184,49 @@ function PayoutDetail({ payout }: { payout: Payout }) {
             </div>
 
             <div className="px-5 py-4">
-                <div className="flex flex-wrap items-center justify-between gap-3 pb-3">
-                    <Label
-                        htmlFor={`income-${payout.id}`}
-                        className="text-xs font-medium tracking-wide text-muted-foreground uppercase"
-                    >
-                        Take-home
-                    </Label>
-                    <div className="flex items-center gap-2">
-                        <Delta
-                            amount={incomeVariance(payout)}
-                            favourable={incomeVariance(payout) >= 0}
-                        />
-                        <AmountInput
-                            id={`income-${payout.id}`}
-                            data-test={`payout-income-${payout.id}`}
-                            value={payout.actualIncome}
-                            disabled={finalized}
-                            onValueChange={(actual) =>
-                                savePayout(withActualIncome(payout, actual))
-                            }
-                            className="w-32"
-                        />
-                    </div>
-                </div>
+                {/*
+                 * The paycheck is the only income the plan forecasts. Anything
+                 * beside it — a bonus, 13th month pay — arrived unplanned and
+                 * gets its own row rather than being folded into the take-home.
+                 */}
+                {payout.incomes.map((income, index) => {
+                    const delta = income.actual - income.planned;
+
+                    return (
+                        <div
+                            key={income.id ?? index}
+                            className="flex flex-wrap items-center justify-between gap-3 pb-3"
+                        >
+                            <Label
+                                htmlFor={`income-${payout.key}-${index}`}
+                                className="text-xs font-medium tracking-wide text-muted-foreground uppercase"
+                            >
+                                {income.source === 'paycheck'
+                                    ? 'Take-home'
+                                    : income.label}
+                            </Label>
+                            <div className="flex items-center gap-2">
+                                <Delta amount={delta} favourable={delta >= 0} />
+                                <AmountInput
+                                    id={`income-${payout.key}-${index}`}
+                                    data-test={`payout-income-${payout.key}-${index}`}
+                                    value={income.actual}
+                                    disabled={finalized}
+                                    onValueChange={(actual) =>
+                                        update(
+                                            withActualIncome(
+                                                payout,
+                                                index,
+                                                actual,
+                                            ),
+                                        )
+                                    }
+                                    className="w-32"
+                                />
+                            </div>
+                        </div>
+                    );
+                })}
 
                 <dl className="divide-y divide-border border-t border-border">
                     {payout.lines.map((line, index) => {
@@ -193,7 +234,7 @@ function PayoutDetail({ payout }: { payout: Payout }) {
 
                         return (
                             <div
-                                key={`${line.groupId}-${line.name}-${index}`}
+                                key={line.id ?? index}
                                 className="flex flex-wrap items-center justify-between gap-3 py-2"
                             >
                                 <dt className="min-w-0">
@@ -211,11 +252,11 @@ function PayoutDetail({ payout }: { payout: Payout }) {
                                     />
                                     <AmountInput
                                         label={`${line.name} actual`}
-                                        data-test={`payout-line-${payout.id}-${index}`}
+                                        data-test={`payout-line-${payout.key}-${index}`}
                                         value={line.actual}
                                         disabled={finalized}
                                         onValueChange={(actual) =>
-                                            savePayout(
+                                            update(
                                                 withActualLine(
                                                     payout,
                                                     index,
@@ -246,42 +287,48 @@ function PayoutDetail({ payout }: { payout: Payout }) {
             >
                 <div>
                     <p
-                        data-test={`payout-left-${payout.id}`}
+                        data-test={`payout-left-${payout.key}`}
                         className="text-2xl font-semibold tracking-tight tabular-nums"
                     >
                         {over ? '−' : ''}
                         {formatPeso(left)}
                     </p>
                     <p
-                        data-test={`payout-variance-${payout.id}`}
+                        data-test={`payout-variance-${payout.key}`}
                         className="text-xs text-foreground/70 tabular-nums"
                     >
                         {over ? 'over' : 'left'} · {summary(payout)}
                     </p>
                 </div>
 
-                <Button
-                    variant={finalized ? 'outline' : 'default'}
-                    size="sm"
-                    data-test={`payout-toggle-${payout.id}`}
-                    onClick={() =>
-                        savePayout(
-                            withStatus(
-                                payout,
-                                finalized ? 'pending' : 'finalized',
-                            ),
-                        )
-                    }
-                >
-                    {finalized ? (
-                        'Reopen'
-                    ) : (
-                        <>
-                            <Check aria-hidden />
-                            Finalize
-                        </>
+                <div className="flex items-center gap-2">
+                    {isDirty && (
+                        <Button
+                            variant="secondary"
+                            size="sm"
+                            data-test={`payout-save-${payout.key}`}
+                            onClick={() => save()}
+                        >
+                            Save
+                        </Button>
                     )}
-                </Button>
+
+                    <Button
+                        variant={finalized ? 'outline' : 'default'}
+                        size="sm"
+                        data-test={`payout-toggle-${payout.key}`}
+                        onClick={toggleStatus}
+                    >
+                        {finalized ? (
+                            'Reopen'
+                        ) : (
+                            <>
+                                <Check aria-hidden />
+                                Finalize
+                            </>
+                        )}
+                    </Button>
+                </div>
             </div>
         </Card>
     );
@@ -289,19 +336,14 @@ function PayoutDetail({ payout }: { payout: Payout }) {
 
 export default function Payouts() {
     const plan = useStoredBudgetPlan();
-    const stored = useStoredPayouts();
-    const [openId, setOpenId] = useState<string | null>(null);
-
     /**
-     * Read once per render, to decide which paydays have already happened.
-     *
-     * TODO(backend): the server should decide this. A scheduled job creating
-     * pending records against its own clock is the whole point of the feature —
-     * until then a payday only appears once you open the page.
+     * Newest first, and only paydays that have actually been: the daily
+     * `payouts:open` command opens them against the server's clock, which is the
+     * one a browser cannot move. Nothing is worked out here.
      */
-    const today = new Date();
+    const payouts = useStoredPayouts();
+    const [openId, setOpenId] = useState<number | null>(null);
 
-    const payouts = plan ? mergePayouts(duePayouts(plan, today), stored) : [];
     const pending = payouts.filter((payout) => !isFinalized(payout)).length;
 
     /**

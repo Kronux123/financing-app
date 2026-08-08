@@ -1,21 +1,58 @@
 <?php
 
+use App\Models\BudgetPlan;
 use App\Models\User;
+use Illuminate\Support\Facades\Artisan;
 
 beforeEach(function () {
-    $this->actingAs(User::factory()->create());
+    $this->user = User::factory()->create();
+
+    $this->actingAs($this->user);
 });
 
 /**
- * The record id for the most recent monthly payday that has already happened.
+ * The card key for the most recent monthly payday that has already happened.
  * The monthly paycheck pays on the last day, so unless today is that day the
  * newest record belongs to last month.
  */
-function lastMonthlyPayoutId(): string
+function lastMonthlyPayoutKey(): string
 {
     $month = now()->endOfMonth()->isToday() ? now() : now()->subMonth();
 
     return $month->format('Y-m').'-monthly';
+}
+
+/**
+ * A plan old enough for last month's payday to count, with that payday opened.
+ *
+ * Built with factories rather than through the form on purpose. A payout exists
+ * only once `payouts:open` has run, and the command leaves alone any payday from
+ * before the plan did — so a plan typed in just now has no history to review,
+ * which is correct and makes it useless as a fixture.
+ */
+function planWithOpenPayouts(User $user, bool $semiMonthly = false, bool $withPayables = false): BudgetPlan
+{
+    $factory = BudgetPlan::factory()->for($user);
+
+    if ($semiMonthly) {
+        $factory = $factory->semiMonthly();
+    }
+
+    // withPaychecks first: the payable attaches to a paycheck, and the callbacks
+    // run in the order they were added.
+    $factory = $factory->withPaychecks();
+
+    if ($withPayables) {
+        $factory = $factory->withPayables();
+    }
+
+    $plan = $factory->create();
+
+    $plan->forceFill(['created_at' => now()->subMonths(6)])->save();
+
+    Artisan::call('payouts:open');
+
+    return $plan->refresh();
 }
 
 test('the payouts page says so when no plan is saved', function () {
@@ -26,171 +63,166 @@ test('the payouts page says so when no plan is saved', function () {
         ->assertNoJavaScriptErrors();
 });
 
+// A plan can be younger than the paydays it would cover, and the command is
+// right not to invent them.
+test('a plan with no payday behind it yet says so', function () {
+    BudgetPlan::factory()->for($this->user)->withPaychecks()->create();
+
+    $page = visit(route('payouts.index'));
+
+    $page->assertSeeIn('@payouts-empty', 'No payday has come round yet')
+        ->assertNoJavaScriptErrors();
+});
+
 test('a payday that has been round shows up filled in from the plan', function () {
-    $id = lastMonthlyPayoutId();
+    planWithOpenPayouts($this->user, withPayables: true);
+    $key = lastMonthlyPayoutKey();
 
-    $page = visit(route('finance.edit'));
+    $page = visit(route('payouts.index'));
 
-    $page->type('@income-monthly', '25000')
-        ->click('@add-payables-monthly')
-        ->type('@item-name-payables-monthly-0', 'Rent')
-        ->type('@item-amount-payables-monthly-0', '9000')
-        ->type('@amount-allowance-monthly', '4000')
-        ->click('@save-plan')
-        ->click('@nav-payouts')
-        ->assertPathIs('/payouts')
-        ->assertSee('Monthly pay')
+    $page->assertSee('Monthly pay')
         ->assertSee('Rent')
         // Actuals start equal to the plan, so a payday that went as intended
         // needs no editing before it is finalized.
-        ->assertValue("@payout-income-{$id}", '25000')
-        ->assertValue("@payout-line-{$id}-0", '9000')
-        ->assertSeeIn("@payout-left-{$id}", '₱12,000')
-        ->assertSeeIn("@payout-variance-{$id}", 'Went to plan');
+        ->assertValue("@payout-income-{$key}-0", '25000')
+        ->assertValue("@payout-line-{$key}-0", '9000')
+        ->assertSeeIn("@payout-left-{$key}", '₱16,000')
+        ->assertSeeIn("@payout-variance-{$key}", 'Went to plan')
+        ->assertNoJavaScriptErrors();
 });
 
 test('a payday starts pending and can be finalized', function () {
-    $id = lastMonthlyPayoutId();
+    planWithOpenPayouts($this->user);
+    $key = lastMonthlyPayoutKey();
 
-    $page = visit(route('finance.edit'));
+    $page = visit(route('payouts.index'));
 
-    $page->type('@income-monthly', '25000')
-        ->click('@save-plan')
-        ->click('@nav-payouts')
-        ->assertSeeIn("@payout-status-{$id}", 'Pending')
+    $page->assertSeeIn("@payout-status-{$key}", 'Pending')
         ->assertSeeIn('@payouts-pending', 'awaiting review')
-        ->click("@payout-toggle-{$id}")
-        ->assertSeeIn("@payout-status-{$id}", 'Finalized');
+        ->click("@payout-toggle-{$key}")
+        ->assertSeeIn("@payout-status-{$key}", 'Finalized');
 });
 
 test('correcting what actually came in shows the variance', function () {
-    $id = lastMonthlyPayoutId();
+    planWithOpenPayouts($this->user, withPayables: true);
+    $key = lastMonthlyPayoutKey();
 
-    $page = visit(route('finance.edit'));
+    $page = visit(route('payouts.index'));
 
-    $page->type('@income-monthly', '25000')
-        ->click('@add-payables-monthly')
-        ->type('@item-name-payables-monthly-0', 'Rent')
-        ->type('@item-amount-payables-monthly-0', '9000')
-        ->click('@save-plan')
-        ->click('@nav-payouts')
-        ->type("@payout-income-{$id}", '24800')
-        ->type("@payout-line-{$id}-0", '9200')
-        ->assertSeeIn("@payout-variance-{$id}", '-₱200 take-home')
-        ->assertSeeIn("@payout-variance-{$id}", '1 line differs')
-        ->assertSeeIn("@payout-left-{$id}", '₱15,600');
+    // The figures move as they are typed; only writing them down waits.
+    $page->type("@payout-income-{$key}-0", '24800')
+        ->type("@payout-line-{$key}-0", '9200')
+        ->assertSeeIn("@payout-variance-{$key}", '-₱200 take-home')
+        ->assertSeeIn("@payout-variance-{$key}", '1 line differs')
+        ->assertSeeIn("@payout-left-{$key}", '₱15,600');
 });
 
 test('a finalized payday cannot be edited until it is reopened', function () {
-    $id = lastMonthlyPayoutId();
+    planWithOpenPayouts($this->user);
+    $key = lastMonthlyPayoutKey();
 
-    $page = visit(route('finance.edit'));
+    $page = visit(route('payouts.index'));
 
-    $page->type('@income-monthly', '25000')
-        ->click('@save-plan')
-        ->click('@nav-payouts')
-        ->click("@payout-toggle-{$id}")
-        ->assertDisabled("@payout-income-{$id}")
-        ->click("@payout-toggle-{$id}")
-        ->assertEnabled("@payout-income-{$id}");
+    $page->click("@payout-toggle-{$key}")
+        ->assertDisabled("@payout-income-{$key}-0")
+        ->click("@payout-toggle-{$key}")
+        ->assertEnabled("@payout-income-{$key}-0");
 });
 
 test('a corrected payday survives a reload', function () {
-    $id = lastMonthlyPayoutId();
+    planWithOpenPayouts($this->user);
+    $key = lastMonthlyPayoutKey();
 
-    $page = visit(route('finance.edit'));
+    $page = visit(route('payouts.index'));
 
-    $page->type('@income-monthly', '25000')
-        ->click('@save-plan')
-        ->click('@nav-payouts')
-        ->type("@payout-income-{$id}", '24800')
-        ->click("@payout-toggle-{$id}");
+    $page->type("@payout-income-{$key}-0", '24800')
+        ->click("@payout-save-{$key}")
+        ->assertMissing("@payout-save-{$key}");
 
-    /*
-     * refresh() reloads the url the page was *opened* at, which is /finance —
-     * we walked to /payouts through the sidebar. It still tears down every bit
-     * of in-memory state, so walking back afterwards proves the record was read
-     * from storage rather than remembered.
-     *
-     * Asserting on a payouts element straight after the refresh does not fail,
-     * it hangs: the locator waits for something that will never appear on
-     * /finance, and inputValue() has no deadline of its own.
-     */
+    // Nothing was walked to here, so refresh() lands back on this page.
     $page->refresh()
-        ->assertPathIs('/finance')
-        ->click('@nav-payouts')
-        ->assertValue("@payout-income-{$id}", '24800')
-        ->assertSeeIn("@payout-status-{$id}", 'Finalized');
+        ->assertPathIs('/payouts')
+        ->assertValue("@payout-income-{$key}-0", '24800');
 });
 
-// The freeze is the whole point: a finalized payday is the record of what
-// happened, and editing the plan afterwards must not rewrite it.
+test('finalizing writes down a correction that was still open', function () {
+    planWithOpenPayouts($this->user);
+    $key = lastMonthlyPayoutKey();
+
+    $page = visit(route('payouts.index'));
+
+    $page->type("@payout-income-{$key}-0", '24800')
+        ->click("@payout-toggle-{$key}")
+        ->assertSeeIn("@payout-status-{$key}", 'Finalized');
+
+    $page->refresh()
+        ->assertValue("@payout-income-{$key}-0", '24800')
+        ->assertSeeIn("@payout-status-{$key}", 'Finalized');
+});
+
+// The snapshot is the whole point: a payday is the record of what happened, and
+// editing the plan afterwards must not rewrite it.
 test('a finalized payday stops following the plan', function () {
-    $id = lastMonthlyPayoutId();
+    planWithOpenPayouts($this->user);
+    $key = lastMonthlyPayoutKey();
 
-    $page = visit(route('finance.edit'));
+    $page = visit(route('payouts.index'));
 
-    $page->type('@income-monthly', '25000')
-        ->click('@save-plan')
-        ->click('@nav-payouts')
-        ->click("@payout-toggle-{$id}")
+    $page->click("@payout-toggle-{$key}")
         ->click('@nav-finance')
         ->type('@income-monthly', '31000')
         ->click('@save-plan')
+        ->assertSee('Budget plan saved.')
         ->click('@nav-payouts')
-        ->assertValue("@payout-income-{$id}", '25000');
+        ->assertValue("@payout-income-{$key}-0", '25000');
 });
 
-test('an untouched payday still follows the plan', function () {
-    $id = lastMonthlyPayoutId();
+/*
+ * The record is frozen when it is opened, not when it is touched. This used to
+ * assert the opposite — an untouched payday followed the plan — because the page
+ * derived it from the plan on every render. The server opens it now, and copies
+ * the plan into it once.
+ */
+test('an untouched payday does not follow the plan either', function () {
+    planWithOpenPayouts($this->user);
+    $key = lastMonthlyPayoutKey();
 
-    $page = visit(route('finance.edit'));
+    $page = visit(route('payouts.index'));
 
-    $page->type('@income-monthly', '25000')
-        ->click('@save-plan')
-        ->click('@nav-payouts')
-        ->assertValue("@payout-income-{$id}", '25000')
+    $page->assertValue("@payout-income-{$key}-0", '25000')
         ->click('@nav-finance')
         ->type('@income-monthly', '31000')
         ->click('@save-plan')
+        ->assertSee('Budget plan saved.')
         ->click('@nav-payouts')
-        ->assertValue("@payout-income-{$id}", '31000');
+        ->assertValue("@payout-income-{$key}-0", '25000');
 });
 
 test('semi-monthly pay gives two records a month', function () {
-    $page = visit(route('finance.edit'));
+    planWithOpenPayouts($this->user, semiMonthly: true);
 
-    $page->click('@cadence-semi-monthly')
-        ->type('@income-mid-month', '12500')
-        ->type('@income-end-month', '12500')
-        ->click('@save-plan')
-        ->click('@nav-payouts')
-        ->assertSee('15th')
-        ->assertSee('End of month');
+    $page = visit(route('payouts.index'));
+
+    $page->assertSee('15th')
+        ->assertSee('End of month')
+        ->assertNoJavaScriptErrors();
 });
 
 test('the payouts page has no accessibility issues', function () {
-    $page = visit(route('finance.edit'));
+    planWithOpenPayouts($this->user, withPayables: true);
 
-    $page->type('@income-monthly', '25000')
-        ->click('@add-payables-monthly')
-        ->type('@item-name-payables-monthly-0', 'Rent')
-        ->type('@item-amount-payables-monthly-0', '9000')
-        ->click('@save-plan')
-        ->click('@nav-payouts')
-        ->wait(5)
-        ->assertNoAccessibilityIssues();
+    $page = visit(route('payouts.index'));
+
+    $page->wait(5)->assertNoAccessibilityIssues();
 });
 
 test('the payouts page has no accessibility issues in dark mode', function () {
-    $id = lastMonthlyPayoutId();
+    planWithOpenPayouts($this->user);
+    $key = lastMonthlyPayoutKey();
 
-    $page = visit(route('finance.edit'))->inDarkMode();
+    $page = visit(route('payouts.index'))->inDarkMode();
 
-    $page->type('@income-monthly', '25000')
-        ->click('@save-plan')
-        ->click('@nav-payouts')
-        ->click("@payout-toggle-{$id}")
+    $page->click("@payout-toggle-{$key}")
         ->wait(5)
         ->assertNoAccessibilityIssues();
 });
