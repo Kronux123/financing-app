@@ -15,9 +15,26 @@ if [ -n "$SKIP_PREPUSH" ]; then
     exit 0
 fi
 
+# Probed by running it, not with `command -v`. Herd ships composer as a .bat,
+# which carries no executable bit, so `command -v` rejects it even though the
+# shell runs it happily and its directory is on PATH. Everywhere else the
+# plain name is the one that answers.
+for candidate in composer composer.bat; do
+    if "$candidate" --version >/dev/null 2>&1; then
+        COMPOSER="$candidate"
+        break
+    fi
+done
+
+if [ -z "$COMPOSER" ]; then
+    echo "pre-push: could not find composer on PATH -- push aborted." >&2
+    echo "Run the checks yourself with: composer ci:push" >&2
+    exit 1
+fi
+
 echo "pre-push: running static checks and tests..."
 
-if ! composer ci:push; then
+if ! "$COMPOSER" ci:push; then
     echo ""
     echo "pre-push: FAILED -- push aborted."
     echo ""
