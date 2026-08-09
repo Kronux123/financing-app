@@ -11,6 +11,16 @@ Tailwind's -400/-500/-600 emerald and rose steps fail axe's 4.5:1 contrast at 14
 
 `assertNoAccessibilityIssues()` in both modes is what catches this; add it when a page gets tinted text.
 
+## Every page wrapper is the same, and it is not centred
+The outer div of a page inside the app layout is `flex w-full flex-col gap-6 p-4 md:p-6`. No `mx-auto`, no `max-w-*` — the sidebar already sets the reading width, and a second cap inside it left the content floating in a narrow column with dead space either side.
+
+These had drifted into three different widths: `max-w-7xl` on dashboard, finance and months, `max-w-3xl` on debt and payouts, and no cap at all on activities. Activities was the one that looked right, so it is now the default everywhere. If a page genuinely needs a narrower measure, constrain the block that needs it, not the whole page.
+
+## A fade-in reveal drops muted text under the contrast floor
+Animating opacity on a block that contains `text-muted-foreground` fails axe for as long as the animation is mid-flight. The token is `#737373` — 4.6:1 on white, just over the line — and part-opacity blends it toward the background: at the values axe caught on the landing page it computed `#898989`, or 3.49:1. A scroll-driven reveal makes this worse than a load animation, because the element sits part-faded for the whole time you are scrolling toward it.
+
+`rise-on-scroll` in `app.css` therefore animates `transform` only. Translation never touches a computed colour, so the motion is free. Keep opacity fades for things that finish on load and are done with — `rise-in` fades because it has completed long before axe or a reader arrives.
+
 ## The swept remainder is derived, never sent to the server
 The "Remaining balance" savings line is computed from the paycheck minus everything hand-entered on it. `serialise()` in use-budget-plan.ts filters it out, and `useStoredBudgetPlan()` rebuilds it with `withSweptRemainders()` on the way back in. Only `savesRemainder` on the paycheck is persisted — see the expense_items migration, which says the same from the other side.
 

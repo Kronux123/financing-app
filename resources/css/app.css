@@ -160,3 +160,83 @@
         @apply bg-background text-foreground;
     }
 }
+
+/*
+ * Landing page motion lives in `pages/welcome.tsx` as `motion` props, not here.
+ * `tw-animate-css` (imported above) still covers the component-level enter/exit
+ * animations that Radix drives.
+ */
+
+/**
+ * The landing page's depth, in CSS.
+ *
+ * Deliberately not the WebGL field: this is what the page looks like on a
+ * phone, under reduced motion, and in the seconds before the renderer has
+ * loaded — which is most of the time, for most visitors. The 3D layer sits on
+ * top of this and enhances it. It never carries the design alone.
+ *
+ * Both tints come from the goal scale, so the page is lit by the same three
+ * hues the dashboard grades savings with.
+ */
+@utility page-glow {
+    background-image:
+        radial-gradient(
+            55rem 38rem at 12% -8%,
+            color-mix(in oklch, var(--goal-close) 24%, transparent),
+            transparent 72%
+        ),
+        radial-gradient(
+            48rem 34rem at 88% 2%,
+            color-mix(in oklch, var(--goal-met) 20%, transparent),
+            transparent 72%
+        ),
+        radial-gradient(
+            60rem 40rem at 50% 105%,
+            color-mix(in oklch, var(--goal-behind) 12%, transparent),
+            transparent 72%
+        );
+}
+
+/**
+ * Frosted glass, in the iOS sense: a heavy blur with the saturation pushed up
+ * so colour from the backdrop bleeds through, plus a specular hairline along
+ * the top edge and a soft drop shadow to lift it off the page.
+ *
+ * The saturate() is what separates this from a plain `backdrop-blur` — it is
+ * why the glow behind the panel reads as tinted light rather than grey haze.
+ *
+ * The tint comes from `--sidebar`, so the panel stays on the app's own palette
+ * in both themes rather than being a fixed white or black wash. The two inset
+ * lines are pure white and pure black at low alpha: a lit top edge and a
+ * shaded bottom one, which is what gives the panel a thickness.
+ */
+@utility glass-panel {
+    background-color: color-mix(in oklch, var(--sidebar) 58%, transparent);
+    backdrop-filter: blur(28px) saturate(180%);
+    -webkit-backdrop-filter: blur(28px) saturate(180%);
+    border: 1px solid color-mix(in oklch, var(--foreground) 12%, transparent);
+    box-shadow:
+        inset 0 1px 0 0 rgb(255 255 255 / 0.12),
+        inset 0 -1px 0 0 rgb(0 0 0 / 0.06),
+        0 10px 30px -12px rgb(0 0 0 / 0.45);
+}
+
+/**
+ * A ruled grid, faded out where it would compete with text.
+ *
+ * The line colour is `--ring` rather than `--border`: at oklch lightness 0.269
+ * the border step sits so close to the 0.145 dark background that the ruling
+ * disappeared entirely. `--ring` carries a light and a dark step of its own, so
+ * this still follows the theme.
+ */
+@utility page-grid {
+    background-image:
+        linear-gradient(to right, var(--ring) 1px, transparent 1px),
+        linear-gradient(to bottom, var(--ring) 1px, transparent 1px);
+    background-size: 4.5rem 4.5rem;
+    mask-image: radial-gradient(
+        ellipse 85% 65% at 50% 0%,
+        black 15%,
+        transparent 80%
+    );
+}

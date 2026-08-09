@@ -1,5 +1,6 @@
 import { Link } from '@inertiajs/react';
 import AppLogoIcon from '@/components/app-logo-icon';
+import { PageBackdrop } from '@/components/page-backdrop';
 import { home } from '@/routes';
 import type { AuthLayoutProps } from '@/types';
 
@@ -9,8 +10,14 @@ export default function AuthSimpleLayout({
     description,
 }: AuthLayoutProps) {
     return (
-        <div className="flex min-h-svh flex-col items-center justify-center gap-6 bg-background p-6 md:p-10">
-            <div className="w-full max-w-sm">
+        /*
+         * No `bg-background` here — body already paints it, and an opaque
+         * surface on this wrapper would sit on top of the backdrop and hide it.
+         */
+        <div className="relative flex min-h-svh flex-col items-center justify-center gap-6 p-6 md:p-10">
+            <PageBackdrop variant="auth" />
+
+            <div className="relative z-10 w-full max-w-sm">
                 <div className="flex flex-col gap-8">
                     <div className="flex flex-col items-center gap-4">
                         <Link
