@@ -46,6 +46,7 @@
     "scripts": {
         "setup": [
             "composer install",
+            "@hooks",
             "@php -r \"file_exists('.env') || copy('.env.example', '.env');\"",
             "@php artisan key:generate",
             "@php artisan migrate --force",
@@ -66,12 +67,27 @@
             "Composer\\Config::disableProcessTimeout",
             "phpstan analyse --memory-limit=2G"
         ],
+        "hooks": [
+            "git config core.hooksPath .githooks"
+        ],
+        "ci:static": [
+            "Composer\\Config::disableProcessTimeout",
+            "@php artisan wayfinder:generate --with-form",
+            "@lint:check",
+            "npm run format:check",
+            "npm run lint:check",
+            "npm run types:check",
+            "@stan"
+        ],
+        "ci:push": [
+            "Composer\\Config::disableProcessTimeout",
+            "@ci:static",
+            "@php artisan config:clear --ansi",
+            "@php artisan test --exclude-testsuite=Browser --compact"
+        ],
         "ci:check": [
             "Composer\\Config::disableProcessTimeout",
-            "npm run lint:check",
-            "npm run format:check",
-            "npm run types:check",
-            "@stan",
+            "@ci:static",
             "@test"
         ],
         "test": [
