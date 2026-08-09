@@ -30,9 +30,16 @@
             }
         </style>
 
-        <link rel="icon" href="/favicon.ico" sizes="any">
-        <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-        <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+        {{--
+            The ?v= is not decoration. Browsers cache favicons far harder than
+            any other asset — Chrome keeps them in a separate store that a
+            normal hard reload does not clear, so a replaced icon can keep
+            showing the old one for days. Changing the query string is what
+            actually forces the re-fetch. Bump it whenever the icons change.
+        --}}
+        <link rel="icon" href="/favicon.ico?v=2" sizes="any">
+        <link rel="icon" href="/favicon.svg?v=2" type="image/svg+xml">
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=2">
 
         @fonts
 
