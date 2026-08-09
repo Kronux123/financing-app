@@ -1,0 +1,33 @@
+#!/bin/sh
+#
+# Runs the checks that .github/workflows/lint.yml runs, plus the non-browser
+# tests, before anything leaves the machine. Browser tests are left to CI --
+# they need a fresh `npm run build` and take long enough that a push-time wait
+# is what makes people reach for --no-verify.
+#
+# Enabled by `composer hooks` (which `composer setup` calls). To skip a single
+# push: git push --no-verify
+
+set -e
+
+if [ -n "$SKIP_PREPUSH" ]; then
+    echo "pre-push: skipped via SKIP_PREPUSH"
+    exit 0
+fi
+
+echo "pre-push: running static checks and tests..."
+
+if ! composer ci:push; then
+    echo ""
+    echo "pre-push: FAILED -- push aborted."
+    echo ""
+    echo "  formatting   composer lint (PHP) / npm run format (JS)"
+    echo "  lint         npm run lint"
+    echo "  types        npm run types:check      (no autofix)"
+    echo "  static       composer stan            (no autofix)"
+    echo ""
+    echo "Re-run everything with: composer ci:push"
+    exit 1
+fi
+
+echo "pre-push: all checks passed."

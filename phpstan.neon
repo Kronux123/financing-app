@@ -8,3 +8,10 @@ parameters:
         - routes
 
     level: 5
+
+    # Read the casts() method body instead of its declared return type. Larastan
+    # defaults this off and falls back to the `@return array<string, string>`
+    # docblock, which widens `PayoutStatus::class` to plain `string` and drops
+    # every cast — so date/enum attributes come back as string and any ->format()
+    # or ->value on them is reported as a call on string.
+    parseModelCastsMethod: true

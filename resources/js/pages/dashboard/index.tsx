@@ -467,7 +467,8 @@ export default function Dashboard() {
                                     className="py-10 text-sm text-muted-foreground"
                                 >
                                     No month has been settled yet. Finalize a
-                                    payday on the payouts page and it lands here.
+                                    payday on the payouts page and it lands
+                                    here.
                                 </p>
                             )}
                         </CardContent>

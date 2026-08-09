@@ -46,7 +46,7 @@ trait BudgetPlanValidationRules
                 'integer',
                 Rule::exists('expense_items', 'id')->where(
                     'budget_plan_id',
-                    $plan?->id ?? 0,
+                    $plan->id ?? 0,
                 ),
             ],
             'items.*.paycheckId' => ['required', 'string', 'in_array:paychecks.*.id'],
