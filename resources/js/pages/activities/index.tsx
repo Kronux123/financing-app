@@ -79,7 +79,7 @@ export default function ActivitiesPage() {
         <>
             <Head title="Activities" />
 
-            <div className="flex h-full flex-1 flex-col gap-4 overflow-x-auto rounded-xl p-4">
+            <div className="flex w-full flex-1 flex-col gap-6 overflow-x-auto p-4 md:p-6">
                 <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
                     <div>
                         <p className="text-sm font-medium tracking-[0.2em] text-muted-foreground uppercase">

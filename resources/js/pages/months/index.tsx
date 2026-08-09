@@ -71,7 +71,7 @@ export default function DashboardMonths() {
         <>
             <Head title="Savings calendar" />
 
-            <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 p-4 md:p-6">
+            <div className="flex w-full flex-col gap-6 p-4 md:p-6">
                 <header className="flex flex-wrap items-end justify-between gap-3">
                     <div>
                         <h1 className="text-2xl font-semibold tracking-tight">

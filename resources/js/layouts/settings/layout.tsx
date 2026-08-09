@@ -32,7 +32,11 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
     const { isCurrentOrParentUrl } = useCurrentUrl();
 
     return (
-        <div className="px-4 py-6">
+        // Same wrapper as every other page — see `.ai/rules/js.md`. The inner
+        // `max-w-xl` on the form below stays: a form is a reading measure, and
+        // constraining that block is the right way to do it rather than
+        // narrowing the whole page.
+        <div className="flex w-full flex-col gap-6 p-4 md:p-6">
             <Heading
                 title="Settings"
                 description="Manage your profile and account settings"

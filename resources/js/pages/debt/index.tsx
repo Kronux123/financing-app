@@ -122,7 +122,7 @@ export default function Debt() {
         <>
             <Head title="Debt" />
 
-            <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 p-4 md:p-6">
+            <div className="flex w-full flex-col gap-6 p-4 md:p-6">
                 <header className="flex flex-wrap items-end justify-between gap-4">
                     <div>
                         <h1 className="text-2xl font-semibold tracking-tight">
