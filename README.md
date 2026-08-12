@@ -58,6 +58,15 @@ the years your ledger actually reaches. Each cell shows the amount, its
 percentage of the monthly goal, and the peso gap to it. Months with no data are
 drawn as dashed outlines so an unrecorded month does not read as a bad one.
 
+**Exports** — Any settled month downloads from its cell in the calendar, as a
+spreadsheet or as a PDF, and the whole year as one workbook. The sheet is a real
+`.xlsx`: frozen headings, an autofilter, peso formats, group totals, and payday
+subtotals written as formulas so correcting a figure moves the totals with it. The
+PDF is a statement — what came in, what went out, and where the month's income
+went — rendered through headless Chromium, so it is styled in ordinary CSS. Both
+are written from the same breakdown and count only paydays that have been
+finalized.
+
 **Debt** — Payables ticked as debt, showing what is left on each, the order worth
 clearing them in, and how long until the last one is gone.
 
@@ -99,6 +108,7 @@ PHP half is tested but uncalled, so the two can drift without anything failing.
 | Styling   | Tailwind CSS 4 (CSS-first config), shadcn-style UI       |
 | Build     | Vite 8, SSR enabled                                     |
 | Auth      | Laravel Fortify, `@laravel/passkeys`                    |
+| Documents | spatie/laravel-pdf via chrome-php, PhpSpreadsheet        |
 | Routing   | Laravel Wayfinder (typed route helpers)                 |
 | Testing   | Pest 4, Pest Browser plugin, Playwright                 |
 | Analysis  | Larastan, Pint, ESLint, Prettier, `tsc`                 |
@@ -110,6 +120,9 @@ PHP half is tested but uncalled, so the two can drift without anything failing.
 - Composer
 - Node.js **22** and npm
 - SQLite (default; any Laravel-supported driver works via `.env`)
+- A Chrome, Chromium or Edge binary, for the PDF export only. Point
+  `LARAVEL_PDF_CHROME_BINARY` at it in `.env`; nothing else in the app needs it,
+  and the test suite fakes the renderer rather than launching one.
 
 ## Getting started
 
@@ -156,20 +169,20 @@ chart and in the savings calendar.
 
 ## Commands
 
-| Command                    | What it does                              |
-| -------------------------- | ----------------------------------------- |
-| `npm run dev`              | Vite dev server with hot reloading        |
-| `npm run build`            | Production build                          |
-| `npm run build:ssr`        | Production build including the SSR bundle |
-| `composer dev`             | Server, queue worker and Vite together    |
-| `composer test`            | Pint check, then the full Pest suite      |
-| `composer ci:check`        | Everything CI runs, in one command        |
-| `composer lint`            | Fix PHP style with Pint                   |
-| `composer stan`            | Static analysis with Larastan             |
-| `npm run lint`             | Fix JS/TS with ESLint                     |
-| `npm run format`           | Format `resources/` with Prettier         |
-| `npm run types:check`      | Typecheck with `tsc --noEmit`             |
-| `php artisan payouts:open` | Open a payout for each payday that has been |
+| Command                                      | What it does                                |
+| -------------------------------------------- | ------------------------------------------- |
+| `npm run dev`                                | Vite dev server with hot reloading          |
+| `npm run build`                              | Production build                            |
+| `npm run build:ssr`                          | Production build including the SSR bundle   |
+| `composer dev`                               | Server, queue worker and Vite together      |
+| `composer test`                              | Pint check, then the full Pest suite        |
+| `composer ci:check`                          | Everything CI runs, in one command          |
+| `composer lint`                              | Fix PHP style with Pint                     |
+| `composer stan`                              | Static analysis with Larastan               |
+| `npm run lint`                               | Fix JS/TS with ESLint                       |
+| `npm run format`                             | Format `resources/` with Prettier           |
+| `npm run types:check`                        | Typecheck with `tsc --noEmit`               |
+| `php artisan payouts:open`                   | Open a payout for each payday that has been |
 
 `payouts:open` is scheduled daily at 01:00 in `routes/console.php`. It is safe to
 run as often as you like and safe to miss: it only opens what is not already
@@ -242,20 +255,26 @@ A few quirks worth knowing before you add to that suite — the full list lives 
 
 ## Routes
 
-| Method | URI                        | Name                   |
-| ------ | -------------------------- | ---------------------- |
-| GET    | `/`                        | `home`                 |
-| GET    | `/dashboard`               | `dashboard`            |
-| GET    | `/dashboard/months`        | `dashboard.months`     |
-| GET    | `/dashboard/activities`    | `dashboard.activities` |
-| GET    | `/finance`                 | `finance.edit`         |
-| PUT    | `/finance`                 | `finance.update`       |
-| GET    | `/debt`                    | `debt.index`           |
-| GET    | `/payouts`                 | `payouts.index`        |
-| PUT    | `/payouts/{payout}`        | `payouts.update`       |
-| PATCH  | `/payouts/{payout}/status` | `payouts.status`       |
-| GET    | `/settings/profile`        | `profile.edit`         |
-| GET    | `/settings/security`       | `security.edit`        |
+| Method | URI                                | Name                    |
+| ------ | ---------------------------------- | ----------------------- |
+| GET    | `/`                                | `home`                  |
+| GET    | `/dashboard`                       | `dashboard`             |
+| GET    | `/dashboard/months`                | `dashboard.months`      |
+| GET    | `/dashboard/months/{month}/sheet`  | `dashboard.months.sheet`|
+| GET    | `/dashboard/months/{month}/pdf`    | `dashboard.months.pdf`  |
+| GET    | `/dashboard/years/{year}/sheet`    | `dashboard.years.sheet` |
+| GET    | `/dashboard/activities`            | `dashboard.activities`  |
+| GET    | `/finance`                         | `finance.edit`          |
+| PUT    | `/finance`                         | `finance.update`        |
+| GET    | `/debt`                            | `debt.index`            |
+| GET    | `/payouts`                         | `payouts.index`         |
+| PUT    | `/payouts/{payout}`                | `payouts.update`        |
+| PATCH  | `/payouts/{payout}/status`         | `payouts.status`        |
+| GET    | `/settings/profile`                | `profile.edit`          |
+| GET    | `/settings/security`               | `security.edit`         |
+
+The two export patterns keep `2026-07` and `2026` apart, so a month can never be
+read as a year or the other way about.
 
 Everything except `/` sits behind `auth` and `verified`. Fortify adds the
 authentication routes on top of these, and `routes/settings.php` carries the
@@ -275,17 +294,21 @@ app/
     Payouts/OpenPayoutsForPlan Opens a payday and copies the plan into it
     Payouts/SavePayout         Records what a payday actually did
     Payouts/MonthlySavings     What each settled month put by
+    Payouts/ActivityLog        The ledger read end to end, paginated in SQL
+    Payouts/MonthBreakdown     A month's saving taken apart, for the exports
+    Payouts/BreakdownSheet     That breakdown as a formatted workbook
   Concerns/ConvertsMoney       The peso/centavo boundary, in one place
   Console/Commands/OpenPayouts The daily `payouts:open` command
   Enums/                       ExpenseGroup, PayCadence, IncomeSource, PayoutStatus
   Http/
-    Controllers/               Dashboard, Finance, Payout, PayoutStatus, Settings
+    Controllers/               Dashboard, Finance, Payout, Activity, MonthExport, …
     Requests/                  Validation, and the wire-to-column translation
     Resources/                 The column-to-wire translation
   Models/                      BudgetPlan, Paycheck, ExpenseItem, Payout, …
 database/migrations/           Six finance tables, each documented in place
 resources/
   css/app.css                  Tailwind 4 theme, including the --goal-* scale
+  views/exports/month.blade.php  The pdf document, in self-contained css
   js/
     components/
       dashboard/               SavingsCalendar, SavingsChart
@@ -349,6 +372,20 @@ edit collapsed it to zero. It also decides how saving is measured — since the
 swept line never reaches a payout, a month's saving is income less living costs
 rather than the savings lines added up.
 
+**One breakdown, two documents.** The spreadsheet and the PDF are written from the
+same `MonthBreakdown`, and the month's saving is asked of `MonthlySavings` rather
+than worked out again — a file that disagreed with the calendar cell it was
+downloaded from would be worse than no file. Sums the documents merely *display*
+live behind that boundary too, so a Blade template never adds anything up. Neither
+file carries the monthly goal: that is computed in the browser from the stored
+plan, and copying the sum into PHP to print it would be a second definition
+waiting to drift from the first.
+
+The PDF renders through headless Chromium via `chrome-php` rather than Browsershot,
+which is the package default. Browsershot shells out to Node at request time, and
+the production image carries Node only in its build stage — so the container needs
+a Chromium binary and a font package, but no Node at all.
+
 **The goal-tracking colour scale.** Progress against a target uses three hues
 rather than three shades of one, so the tiers stay apart for colour-blind
 readers: orange behind, blue close, green met. Blue in the middle is what carries
@@ -359,7 +396,9 @@ selected per mode against each card surface, and validated all-pairs.
 
 Colour never carries meaning alone. It appears as a dot, a bar or a 10% tint,
 while the exact percentage is always printed alongside and text stays on ink
-tokens.
+tokens. The PDF's proportion bar reuses those same three steps, for the same
+reason and with the same relief: every segment is named, percentaged and totalled
+in the key beneath it.
 
 The budget planner reuses the same tokens with inverted thresholds — over 100%
 allocated is orange, 90–99% blue, under 90% green — because overspending a

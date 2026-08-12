@@ -42,13 +42,19 @@ class MonthlySavings
             ->map(fn (Collection $paydays, string $month): array => [
                 'month' => $month,
                 /** Every payday in the month, so semi-monthly pay adds up. */
-                'saved' => $paydays->sum($this->saved(...)),
+                'saved' => $paydays->sum($this->savedOn(...)),
             ])
             ->values();
     }
 
-    /** Centavos. Negative when a month spent more than it brought in. */
-    private function saved(Payout $payout): int
+    /**
+     * Centavos. Negative when a month spent more than it brought in.
+     *
+     * Public because MonthBreakdown reads it too: a breakdown that disagreed
+     * with the tile it was downloaded from would be worse than no breakdown, so
+     * there is one definition of what a payday saved and this is it.
+     */
+    public function savedOn(Payout $payout): int
     {
         $livingCosts = $payout->lines
             ->filter(fn (PayoutLine $line): bool => in_array(

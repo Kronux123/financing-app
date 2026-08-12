@@ -1,3 +1,11 @@
+import { FileSpreadsheet, FileText } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 
 const monthLabels = [
@@ -13,6 +21,22 @@ const monthLabels = [
     'Oct',
     'Nov',
     'Dec',
+];
+
+/** Spelled out for the download labels, where `Jul` reads as an abbreviation. */
+const monthNames = [
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December',
 ];
 
 type Tier = {
@@ -60,6 +84,52 @@ const tierFor = (share: number): Tier => {
     return tiers[0];
 };
 
+type MonthExports = {
+    sheet: string;
+    pdf: string;
+};
+
+type ExportLinkProps = {
+    href: string;
+    /** Both the tooltip and the accessible name, so the two cannot drift. */
+    label: string;
+    testId: string;
+    icon: LucideIcon;
+};
+
+/**
+ * One download control.
+ *
+ * An icon on its own says very little, so the label is the whole explanation:
+ * shown on hover and focus, and read out as the accessible name. `cursor-pointer`
+ * is spelled out because these are buttons in every way but the tag, and a
+ * pointer is what tells you the icon is not decoration.
+ */
+function ExportLink({ href, label, testId, icon: Icon }: ExportLinkProps) {
+    return (
+        <Tooltip>
+            <TooltipTrigger asChild>
+                <Button
+                    asChild
+                    variant="ghost"
+                    size="icon"
+                    className="size-7 cursor-pointer"
+                >
+                    {/*
+                     * A plain anchor, not an Inertia link: a download is the
+                     * browser's job, and a visit would ask the page to render a
+                     * csv as a component.
+                     */}
+                    <a href={href} data-test={testId} aria-label={label}>
+                        <Icon className="size-3.5" />
+                    </a>
+                </Button>
+            </TooltipTrigger>
+            <TooltipContent>{label}</TooltipContent>
+        </Tooltip>
+    );
+}
+
 type SavingsCalendarProps = {
     /** Twelve entries, January first. `null` means no data recorded yet. */
     months: (number | null)[];
@@ -67,6 +137,12 @@ type SavingsCalendarProps = {
     formatAmount: (value: number) => string;
     /** Zero-based month index to mark as the month in progress. */
     currentMonth?: number;
+    /**
+     * Where a month's breakdown can be downloaded from, by zero-based index.
+     * Only recorded months are asked for — a month with no settled payday has
+     * nothing to write into a file.
+     */
+    exportsFor?: (monthIndex: number) => MonthExports;
 };
 
 export function SavingsCalendar({
@@ -74,6 +150,7 @@ export function SavingsCalendar({
     goal,
     formatAmount,
     currentMonth,
+    exportsFor,
 }: SavingsCalendarProps) {
     return (
         <div className="space-y-4">
@@ -190,6 +267,23 @@ export function SavingsCalendar({
                                     }}
                                 />
                             </div>
+
+                            {exportsFor && (
+                                <div className="mt-2.5 flex items-center gap-1">
+                                    <ExportLink
+                                        href={exportsFor(index).sheet}
+                                        label={`Download ${monthNames[index]} spreadsheet`}
+                                        testId={`export-sheet-${index + 1}`}
+                                        icon={FileSpreadsheet}
+                                    />
+                                    <ExportLink
+                                        href={exportsFor(index).pdf}
+                                        label={`Download ${monthNames[index]} PDF`}
+                                        testId={`export-pdf-${index + 1}`}
+                                        icon={FileText}
+                                    />
+                                </div>
+                            )}
                         </li>
                     );
                 })}

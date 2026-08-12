@@ -110,6 +110,55 @@ test('a settled month lands in the calendar under its own year', function () {
         ->assertNoJavaScriptErrors();
 });
 
+/*
+ * The hrefs are asserted rather than followed. Clicking one hands the download to
+ * the browser, which either saves a file outside the run or sits waiting for a
+ * dialog — and a browser test that waits has no deadline of its own. What the
+ * files themselves contain is settled in tests/Feature/MonthExportTest.php.
+ */
+test('a settled month offers both breakdowns, and the year offers a sheet', function () {
+    planWithPayday($this->user);
+    $key = newestPaydayKey();
+    $paidOn = Payout::query()->orderByDesc('paid_on')->firstOrFail()->paid_on;
+    $ordinal = (int) $paidOn->format('n');
+
+    $page = visit(route('payouts.index'));
+
+    $page->click("@payout-toggle-{$key}")
+        ->assertSeeIn("@payout-status-{$key}", 'Finalized')
+        ->click('@nav-dashboard')
+        ->click('View all months')
+        ->assertVisible("@export-sheet-{$ordinal}")
+        ->assertAttributeContains("@export-sheet-{$ordinal}", 'href', "/dashboard/months/{$paidOn->format('Y-m')}/sheet")
+        ->assertAttributeContains("@export-pdf-{$ordinal}", 'href', "/dashboard/months/{$paidOn->format('Y-m')}/pdf")
+        ->assertAttributeContains('@export-year-sheet', 'href', "/dashboard/years/{$paidOn->format('Y')}/sheet")
+        /** A month with nothing settled has nothing to download. */
+        ->assertMissing('@export-sheet-'.($ordinal === 12 ? 11 : $ordinal + 1))
+        ->assertNoJavaScriptErrors();
+});
+
+// An icon on its own says nothing about what it will download, so the label is
+// the whole explanation — and it is the accessible name as well as the tooltip.
+test('hovering a download says what it will download', function () {
+    planWithPayday($this->user);
+    $key = newestPaydayKey();
+    $paidOn = Payout::query()->orderByDesc('paid_on')->firstOrFail()->paid_on;
+    $ordinal = (int) $paidOn->format('n');
+    $month = $paidOn->format('F');
+
+    $page = visit(route('payouts.index'));
+
+    $page->click("@payout-toggle-{$key}")
+        ->assertSeeIn("@payout-status-{$key}", 'Finalized')
+        ->click('@nav-dashboard')
+        ->click('View all months')
+        ->assertAriaAttribute("@export-sheet-{$ordinal}", 'label', "Download {$month} spreadsheet")
+        ->assertAriaAttribute("@export-pdf-{$ordinal}", 'label', "Download {$month} PDF")
+        ->hover("@export-sheet-{$ordinal}")
+        ->assertSee("Download {$month} spreadsheet")
+        ->assertNoJavaScriptErrors();
+});
+
 test('the savings calendar has no accessibility issues', function () {
     planWithPayday($this->user);
     $key = newestPaydayKey();

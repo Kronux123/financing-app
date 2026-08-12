@@ -1,5 +1,5 @@
 import { Head, Link } from '@inertiajs/react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, FileSpreadsheet } from 'lucide-react';
 import { useState } from 'react';
 import { SavingsCalendar } from '@/components/dashboard/savings-calendar';
 import { Button } from '@/components/ui/button';
@@ -10,6 +10,11 @@ import { savingsPerMonth } from '@/lib/budget';
 import { formatPeso } from '@/lib/currency';
 import { monthsForYear, summariseYear, yearsIn } from '@/lib/savings';
 import { dashboard } from '@/routes';
+import {
+    pdf as monthPdf,
+    sheet as monthSheet,
+} from '@/routes/dashboard/months';
+import { sheet as yearSheet } from '@/routes/dashboard/years';
 import { index as payoutsRoute } from '@/routes/payouts';
 
 export default function DashboardMonths() {
@@ -40,6 +45,14 @@ export default function DashboardMonths() {
         months,
         goal,
     );
+
+    /**
+     * `2026-07`, which is what both download routes bind on. Built here rather
+     * than in the calendar, because the calendar counts months from zero and
+     * knows nothing about which year it is drawing.
+     */
+    const monthParam = (index: number): string =>
+        `${year}-${String(index + 1).padStart(2, '0')}`;
 
     const summary = [
         {
@@ -138,20 +151,40 @@ export default function DashboardMonths() {
                                 </Button>
                             </div>
 
-                            <div className="text-right">
-                                <p className="text-sm text-muted-foreground">
-                                    Saved in {year}
-                                </p>
-                                <p
-                                    data-test="calendar-total"
-                                    className="text-xl font-semibold tabular-nums"
+                            <div className="flex flex-wrap items-center gap-4">
+                                <div className="text-right">
+                                    <p className="text-sm text-muted-foreground">
+                                        Saved in {year}
+                                    </p>
+                                    <p
+                                        data-test="calendar-total"
+                                        className="text-xl font-semibold tabular-nums"
+                                    >
+                                        {formatPeso(total)}
+                                        <span className="ml-2 text-sm font-normal text-muted-foreground">
+                                            across {recorded}{' '}
+                                            {recorded === 1
+                                                ? 'month'
+                                                : 'months'}
+                                        </span>
+                                    </p>
+                                </div>
+
+                                {/* Every settled month of the year in one sheet. */}
+                                <Button
+                                    asChild
+                                    variant="outline"
+                                    size="sm"
+                                    className="cursor-pointer"
                                 >
-                                    {formatPeso(total)}
-                                    <span className="ml-2 text-sm font-normal text-muted-foreground">
-                                        across {recorded}{' '}
-                                        {recorded === 1 ? 'month' : 'months'}
-                                    </span>
-                                </p>
+                                    <a
+                                        href={yearSheet.url(year)}
+                                        data-test="export-year-sheet"
+                                    >
+                                        <FileSpreadsheet />
+                                        Export {year}
+                                    </a>
+                                </Button>
                             </div>
                         </CardHeader>
 
@@ -165,6 +198,10 @@ export default function DashboardMonths() {
                                         ? today.getMonth()
                                         : undefined
                                 }
+                                exportsFor={(index) => ({
+                                    sheet: monthSheet.url(monthParam(index)),
+                                    pdf: monthPdf.url(monthParam(index)),
+                                })}
                             />
                         </CardContent>
                     </Card>
