@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\ActivityController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\FinanceController;
 use App\Http\Controllers\PayoutController;
@@ -11,7 +12,7 @@ Route::inertia('/', 'welcome')->name('home');
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', [DashboardController::class, 'index'])->name('dashboard');
     Route::get('dashboard/months', [DashboardController::class, 'months'])->name('dashboard.months');
-    Route::inertia('dashboard/activities', 'activities/index')->name('dashboard.activities');
+    Route::get('dashboard/activities', [ActivityController::class, 'index'])->name('dashboard.activities');
     Route::get('finance', [FinanceController::class, 'edit'])->name('finance.edit');
     Route::put('finance', [FinanceController::class, 'update'])->name('finance.update');
     Route::inertia('debt', 'debt/index')->name('debt.index');

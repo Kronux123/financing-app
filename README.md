@@ -42,6 +42,12 @@ finalize the record. A payday falling on a Saturday or Sunday is paid on the
 Friday before it, and a day past the end of a short month is pulled back to the
 last one.
 
+**Activities** — The ledger read end to end, newest payday first: what each one
+brought in, what it sent out, and which of them are still open to correction.
+There is no activities table behind it — an activity is a payday's income or one
+of its lines seen from the outside, so spending the plan never forecast is a line
+with nothing planned against it, marked as such.
+
 **Dashboard** — Savings progress, monthly metrics and a spending breakdown,
 computed from your saved plan. The monthly savings chart is read from the payouts
 ledger instead: a month appears once one of its paydays has been finalized, and

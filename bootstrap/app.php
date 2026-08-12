@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\ActivityController;
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
 use Illuminate\Foundation\Application;
@@ -14,7 +15,13 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        $middleware->encryptCookies(except: ['appearance', 'sidebar_state']);
+        $middleware->encryptCookies(except: [
+            'appearance',
+            'sidebar_state',
+            // The activity log's page size. Written by the client, read by
+            // ActivityController — see the note on ActivityController::ROWS_COOKIE.
+            ActivityController::ROWS_COOKIE,
+        ]);
 
         $middleware->web(append: [
             HandleAppearance::class,

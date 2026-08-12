@@ -13,7 +13,12 @@ import { pageWindow, rowsPerPageOptions } from '@/lib/activities';
 type ActivityPaginationProps = {
     page: number;
     pageCount: number;
-    rowsPerPage: RowsPerPage;
+    /**
+     * Plain `number` rather than `RowsPerPage`: this comes back from the server,
+     * which is where the value is checked against the allowed set. Narrowing it
+     * here would only be asserting something the client cannot know.
+     */
+    rowsPerPage: number;
     firstRow: number;
     lastRow: number;
     totalRows: number;

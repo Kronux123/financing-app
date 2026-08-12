@@ -1,34 +1,73 @@
 /**
- * The activity log is still sample data — nothing writes transactions yet. It is
- * long enough to page through so the paginator has something to do.
+ * The activity log reads the ledger: a row is one of a payday's incomes or one
+ * of its lines, sent by ActivityLog and shaped by ActivityResource. Amounts are
+ * pesos and already signed — money in positive, money out negative.
  */
 export type Activity = {
-    id: number;
+    key: string;
+    /** `2026-07-31`. */
+    date: string;
     title: string;
-    category: 'Spending' | 'Savings';
-    type: string;
+    /** `Payables`, `Allowance`, `Savings`, or `Income`. */
+    category: string;
+    payday: string;
     amount: number;
-    daysAgo: number;
-    status: 'Completed' | 'Pending';
+    isUnplanned: boolean;
+    status: 'pending' | 'finalized';
 };
 
+/** What the paginator holds. Worked out by the server, which does the slicing. */
+export type ActivityPagination = {
+    page: number;
+    pageCount: number;
+    rowsPerPage: number;
+    firstRow: number;
+    lastRow: number;
+    totalRows: number;
+};
+
+/** Kept in step with `ActivityController::ROWS_PER_PAGE`. */
 export const rowsPerPageOptions = [10, 25, 50, 100] as const;
 
 export type RowsPerPage = (typeof rowsPerPageOptions)[number];
 
 export const defaultRowsPerPage: RowsPerPage = 10;
 
-/** Relative labels read better than dates for a log that is always recent. */
-export function relativeDay(daysAgo: number): string {
-    if (daysAgo === 0) {
-        return 'Today';
-    }
+export const rowsPerPageCookie = 'activities_rows';
 
-    if (daysAgo === 1) {
-        return 'Yesterday';
-    }
+/**
+ * A cookie rather than local storage, because the server has to know the page
+ * size before it renders: it is what decides how much to ask the database for.
+ * Local storage never leaves the browser, so it could only ever have arrived one
+ * render too late. Unencrypted and client-written, the way `appearance` and
+ * `sidebar_state` already are — see bootstrap/app.php.
+ */
+export function saveRowsPerPage(rowsPerPage: RowsPerPage): void {
+    const year = 365 * 24 * 60 * 60;
 
-    return `${daysAgo} days ago`;
+    document.cookie = `${rowsPerPageCookie}=${rowsPerPage};path=/;max-age=${year};SameSite=Lax`;
+}
+
+/**
+ * A payday is placed rather than counted back from: history runs to years, and
+ * "412 days ago" tells you nothing an actual date does not tell you better.
+ *
+ * Built from the parts rather than `new Date(iso)`, which reads a bare `Y-m-d`
+ * as UTC midnight and lands on the day before anywhere west of Greenwich.
+ */
+export function formatActivityDate(date: string): string {
+    const [year, month, day] = date.split('-').map(Number);
+
+    return new Date(year, month - 1, day).toLocaleDateString('en-US', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+    });
+}
+
+/** A payday is settled, or it is still open to correction. */
+export function statusLabel(status: Activity['status']): string {
+    return status === 'finalized' ? 'Completed' : 'Pending';
 }
 
 /**
@@ -65,240 +104,3 @@ export function pageWindow(
 
     return pages;
 }
-
-export const activities: Activity[] = [
-    {
-        id: 1,
-        title: 'Mortgage payment',
-        category: 'Spending',
-        type: 'Payment',
-        amount: -1_250,
-        daysAgo: 0,
-        status: 'Completed',
-    },
-    {
-        id: 2,
-        title: 'Salary deposit',
-        category: 'Savings',
-        type: 'Income',
-        amount: 5_800,
-        daysAgo: 1,
-        status: 'Completed',
-    },
-    {
-        id: 3,
-        title: 'Groceries',
-        category: 'Spending',
-        type: 'Purchase',
-        amount: -620,
-        daysAgo: 2,
-        status: 'Completed',
-    },
-    {
-        id: 4,
-        title: 'Spotify subscription',
-        category: 'Spending',
-        type: 'Subscription',
-        amount: -15,
-        daysAgo: 3,
-        status: 'Pending',
-    },
-    {
-        id: 5,
-        title: 'Credit card payment',
-        category: 'Spending',
-        type: 'Payment',
-        amount: -420,
-        daysAgo: 4,
-        status: 'Completed',
-    },
-    {
-        id: 6,
-        title: 'Emergency fund top-up',
-        category: 'Savings',
-        type: 'Transfer',
-        amount: 1_200,
-        daysAgo: 6,
-        status: 'Completed',
-    },
-    {
-        id: 7,
-        title: 'Electricity bill',
-        category: 'Spending',
-        type: 'Payment',
-        amount: -2_340,
-        daysAgo: 7,
-        status: 'Completed',
-    },
-    {
-        id: 8,
-        title: 'Water bill',
-        category: 'Spending',
-        type: 'Payment',
-        amount: -480,
-        daysAgo: 8,
-        status: 'Completed',
-    },
-    {
-        id: 9,
-        title: 'Internet plan',
-        category: 'Spending',
-        type: 'Subscription',
-        amount: -1_699,
-        daysAgo: 9,
-        status: 'Completed',
-    },
-    {
-        id: 10,
-        title: 'Savings pot transfer',
-        category: 'Savings',
-        type: 'Transfer',
-        amount: 3_000,
-        daysAgo: 10,
-        status: 'Completed',
-    },
-    {
-        id: 11,
-        title: 'Fuel',
-        category: 'Spending',
-        type: 'Purchase',
-        amount: -1_100,
-        daysAgo: 11,
-        status: 'Completed',
-    },
-    {
-        id: 12,
-        title: 'Pharmacy',
-        category: 'Spending',
-        type: 'Purchase',
-        amount: -365,
-        daysAgo: 12,
-        status: 'Completed',
-    },
-    {
-        id: 13,
-        title: 'Laptop installment',
-        category: 'Spending',
-        type: 'Payment',
-        amount: -2_500,
-        daysAgo: 13,
-        status: 'Completed',
-    },
-    {
-        id: 14,
-        title: 'Freelance invoice',
-        category: 'Savings',
-        type: 'Income',
-        amount: 12_000,
-        daysAgo: 14,
-        status: 'Pending',
-    },
-    {
-        id: 15,
-        title: 'Mobile load',
-        category: 'Spending',
-        type: 'Purchase',
-        amount: -299,
-        daysAgo: 15,
-        status: 'Completed',
-    },
-    {
-        id: 16,
-        title: 'Health insurance',
-        category: 'Spending',
-        type: 'Payment',
-        amount: -1_850,
-        daysAgo: 16,
-        status: 'Completed',
-    },
-    {
-        id: 17,
-        title: 'Groceries',
-        category: 'Spending',
-        type: 'Purchase',
-        amount: -740,
-        daysAgo: 17,
-        status: 'Completed',
-    },
-    {
-        id: 18,
-        title: 'Cloud storage',
-        category: 'Spending',
-        type: 'Subscription',
-        amount: -129,
-        daysAgo: 18,
-        status: 'Completed',
-    },
-    {
-        id: 19,
-        title: 'Emergency fund top-up',
-        category: 'Savings',
-        type: 'Transfer',
-        amount: 1_200,
-        daysAgo: 20,
-        status: 'Completed',
-    },
-    {
-        id: 20,
-        title: 'Dining out',
-        category: 'Spending',
-        type: 'Purchase',
-        amount: -890,
-        daysAgo: 21,
-        status: 'Completed',
-    },
-    {
-        id: 21,
-        title: 'Salary deposit',
-        category: 'Savings',
-        type: 'Income',
-        amount: 5_800,
-        daysAgo: 22,
-        status: 'Completed',
-    },
-    {
-        id: 22,
-        title: 'Transport card reload',
-        category: 'Spending',
-        type: 'Purchase',
-        amount: -500,
-        daysAgo: 23,
-        status: 'Completed',
-    },
-    {
-        id: 23,
-        title: 'Gym membership',
-        category: 'Spending',
-        type: 'Subscription',
-        amount: -1_500,
-        daysAgo: 25,
-        status: 'Completed',
-    },
-    {
-        id: 24,
-        title: 'Interest earned',
-        category: 'Savings',
-        type: 'Income',
-        amount: 145,
-        daysAgo: 27,
-        status: 'Completed',
-    },
-    {
-        id: 25,
-        title: 'Home repairs',
-        category: 'Spending',
-        type: 'Purchase',
-        amount: -3_200,
-        daysAgo: 28,
-        status: 'Completed',
-    },
-    {
-        id: 26,
-        title: 'Streaming bundle',
-        category: 'Spending',
-        type: 'Subscription',
-        amount: -549,
-        daysAgo: 30,
-        status: 'Pending',
-    },
-];
