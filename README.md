@@ -153,8 +153,21 @@ composer dev
 
 ### First run
 
-Register an account at `/register`, then open `/finance` to build a plan. Save it
-and the dashboard picks it up.
+The quickest way in is the demo account, which arrives with a year behind it:
+
+```bash
+php artisan db:seed --class=DemoUserSeeder
+```
+
+Sign in as `test1@mail.com` / `password`. It carries a semi-monthly plan with two
+debts and a swept remainder, and every payday from January to this month settled —
+enough for the dashboard, the calendar and both exports to have something to say.
+The paydays are opened by `OpenPayoutsForPlan` rather than written directly, so the
+demo data has the same shape as data the app made for itself. Re-running replaces
+the demo user rather than adding a second one.
+
+To start from nothing instead, register an account at `/register`, then open
+`/finance` to build a plan. Save it and the dashboard picks it up.
 
 Payouts only appear once a payday has come round *and* the scheduled command has
 run, and it will not invent paydays from before your plan existed. To see the
@@ -183,6 +196,7 @@ chart and in the savings calendar.
 | `npm run format`                             | Format `resources/` with Prettier           |
 | `npm run types:check`                        | Typecheck with `tsc --noEmit`               |
 | `php artisan payouts:open`                   | Open a payout for each payday that has been |
+| `php artisan db:seed --class=DemoUserSeeder` | Demo account with a year of settled paydays |
 
 `payouts:open` is scheduled daily at 01:00 in `routes/console.php`. It is safe to
 run as often as you like and safe to miss: it only opens what is not already
@@ -305,7 +319,9 @@ app/
     Requests/                  Validation, and the wire-to-column translation
     Resources/                 The column-to-wire translation
   Models/                      BudgetPlan, Paycheck, ExpenseItem, Payout, …
-database/migrations/           Six finance tables, each documented in place
+database/
+  migrations/                  Six finance tables, each documented in place
+  seeders/DemoUserSeeder       A demo account with a year of settled paydays
 resources/
   css/app.css                  Tailwind 4 theme, including the --goal-* scale
   views/exports/month.blade.php  The pdf document, in self-contained css

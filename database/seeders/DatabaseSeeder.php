@@ -19,5 +19,8 @@ class DatabaseSeeder extends Seeder
             'name' => 'Test User',
             'email' => 'test@example.com',
         ]);
+
+        /** An empty account is only half the app — this one has a year behind it. */
+        $this->call(DemoUserSeeder::class);
     }
 }
