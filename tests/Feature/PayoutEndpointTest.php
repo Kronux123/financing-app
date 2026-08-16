@@ -223,6 +223,41 @@ test('a line added while reviewing is unplanned spending', function () {
         ->and($line->isUnplanned())->toBeTrue();
 });
 
+/*
+ * The page cannot tell the two apart on its own. A planned figure of nought says
+ * nothing about whether a payable stood behind the row, so the flag is carried
+ * rather than inferred — and the label it draws has to keep reading right after
+ * the record has been saved and loaded back.
+ */
+test('the page is told which lines were never forecast', function () {
+    $user = User::factory()->create();
+    $payout = payoutFor($user);
+
+    $payload = payoutPayload($payout);
+    $payload['lines'][] = [
+        'id' => null,
+        'group' => ExpenseGroup::Allowance->value,
+        'name' => 'Monitor',
+        'actual' => 12_000,
+    ];
+
+    $this->actingAs($user)->put(route('payouts.update', $payout), $payload)
+        ->assertSessionHasNoErrors();
+
+    $this->actingAs($user)
+        ->get(route('payouts.index'))
+        ->assertInertia(
+            fn (AssertableInertia $page) => $page
+                ->where('payouts.0.lines.0.name', 'Rent')
+                ->where('payouts.0.lines.0.isUnplanned', false)
+                ->where('payouts.0.lines.1.name', 'Monitor')
+                ->where('payouts.0.lines.1.groupId', 'allowance')
+                ->where('payouts.0.lines.1.planned', 0)
+                ->where('payouts.0.lines.1.isUnplanned', true)
+                ->etc()
+        );
+});
+
 test('13th month pay is added as income nobody forecast', function () {
     $user = User::factory()->create();
     $payout = payoutFor($user);

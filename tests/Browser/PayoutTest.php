@@ -206,6 +206,57 @@ test('an untouched payday does not follow the plan either', function () {
         ->assertValue("@payout-income-{$key}-0", '25000');
 });
 
+/*
+ * The one-off that moved the month — a monitor, a hospital visit — has nowhere
+ * else to live. Day-to-day spending stays inside the allowance figure, which is
+ * why this is a line on a payday rather than a ledger of its own.
+ */
+test('a purchase the plan never forecast can be put on the payday', function () {
+    planWithOpenPayouts($this->user, withPayables: true);
+    $key = newestPayoutKey();
+
+    $page = visit(route('payouts.index'));
+
+    // Typed before the button is asked for: it is disabled until the line has a
+    // name, and clicking a disabled control waits without a deadline of its own.
+    $page->click("@payout-add-line-{$key}")
+        ->type("@payout-new-name-{$key}", 'Monitor')
+        ->type("@payout-new-amount-{$key}", '12000')
+        ->click("@payout-confirm-line-{$key}")
+        ->assertSee('Monitor')
+        ->assertValue("@payout-line-{$key}-1", '12000')
+        // 25,000 in, 9,000 of rent, and now the monitor on top.
+        ->assertSeeIn("@payout-left-{$key}", '₱4,000');
+
+    $page->click("@payout-save-{$key}")
+        ->assertSee('Payday updated.');
+
+    // Nothing was walked to here, so refresh() lands back on this page.
+    $page->refresh()
+        ->assertPathIs('/payouts')
+        ->assertSee('Monitor')
+        ->assertSee('Unplanned')
+        ->assertValue("@payout-line-{$key}-1", '12000');
+});
+
+// A planned line is the forecast the payday opened with. Dropping it would leave
+// the actual beside it with nothing to answer to, so only the hand-added ones go.
+test('an unplanned line can be taken back off, a planned one cannot', function () {
+    planWithOpenPayouts($this->user, withPayables: true);
+    $key = newestPayoutKey();
+
+    $page = visit(route('payouts.index'));
+
+    $page->click("@payout-add-line-{$key}")
+        ->type("@payout-new-name-{$key}", 'Monitor')
+        ->type("@payout-new-amount-{$key}", '12000')
+        ->click("@payout-confirm-line-{$key}")
+        ->assertMissing("@payout-remove-line-{$key}-0")
+        ->click("@payout-remove-line-{$key}-1")
+        ->assertDontSee('Monitor')
+        ->assertSeeIn("@payout-left-{$key}", '₱16,000');
+});
+
 test('semi-monthly pay gives two records a month', function () {
     planWithOpenPayouts($this->user, semiMonthly: true);
 
@@ -216,12 +267,21 @@ test('semi-monthly pay gives two records a month', function () {
         ->assertNoJavaScriptErrors();
 });
 
+// With an unplanned line on the record and the form open behind it, so the amber
+// badge and the fields that add one are both in front of axe.
 test('the payouts page has no accessibility issues', function () {
     planWithOpenPayouts($this->user, withPayables: true);
+    $key = newestPayoutKey();
 
     $page = visit(route('payouts.index'));
 
-    $page->wait(5)->assertNoAccessibilityIssues();
+    $page->click("@payout-add-line-{$key}")
+        ->type("@payout-new-name-{$key}", 'Monitor')
+        ->type("@payout-new-amount-{$key}", '12000')
+        ->click("@payout-confirm-line-{$key}")
+        ->click("@payout-add-line-{$key}")
+        ->wait(5)
+        ->assertNoAccessibilityIssues();
 });
 
 test('the payouts page has no accessibility issues in dark mode', function () {
@@ -230,7 +290,11 @@ test('the payouts page has no accessibility issues in dark mode', function () {
 
     $page = visit(route('payouts.index'))->inDarkMode();
 
-    $page->click("@payout-toggle-{$key}")
+    $page->click("@payout-add-line-{$key}")
+        ->type("@payout-new-name-{$key}", 'Monitor')
+        ->type("@payout-new-amount-{$key}", '12000')
+        ->click("@payout-confirm-line-{$key}")
+        ->click("@payout-toggle-{$key}")
         ->wait(5)
         ->assertNoAccessibilityIssues();
 });

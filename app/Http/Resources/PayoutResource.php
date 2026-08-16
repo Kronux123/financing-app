@@ -78,6 +78,12 @@ class PayoutResource extends JsonResource
             'name' => $line->name,
             'planned' => $this->toPesos($line->planned),
             'actual' => $this->toPesos($line->actual),
+            /**
+             * Spending the plan never forecast, named the way the activity log
+             * names it. The page cannot work this out for itself: a nought
+             * planned alone does not say whether a payable stood behind it.
+             */
+            'isUnplanned' => $line->isUnplanned(),
         ];
     }
 }

@@ -14,6 +14,12 @@
  * Nothing in here touches the DOM or storage.
  */
 
+import {
+    allowanceGroupId,
+    payablesGroupId,
+    savingsGroupId,
+} from '@/lib/budget';
+
 export type PayoutStatus = 'pending' | 'finalized';
 
 export type IncomeSource = 'paycheck' | 'bonus' | 'thirteenth_month' | 'other';
@@ -35,6 +41,8 @@ export type PayoutLine = {
     name: string;
     planned: number;
     actual: number;
+    /** Money the plan never forecast: no payable behind it, nought planned. */
+    isUnplanned: boolean;
 };
 
 export type Payout = {
@@ -116,5 +124,50 @@ export const withActualLine = (
         lines: payout.lines.map((line, at) =>
             at === index ? { ...line, actual } : line,
         ),
+    };
+};
+
+/**
+ * The groups a hand-added line may land in, in the order the plan lists them.
+ *
+ * Named here rather than read off the plan: the group is copied onto a line when
+ * the payday opens, so a record keeps its own labels once the plan has moved on.
+ */
+export const lineGroups: { id: string; label: string }[] = [
+    { id: payablesGroupId, label: 'Payables' },
+    { id: allowanceGroupId, label: 'Allowance' },
+    { id: savingsGroupId, label: 'Savings' },
+];
+
+/**
+ * Spending the plan never saw coming, put on the payday it came out of.
+ *
+ * `planned` is nought and stays nought — the server sets it on a row with no id
+ * and refuses to move it afterwards — which is exactly what unplanned means. The
+ * flag is set here too so the row reads the same before its first save as after.
+ */
+export const withExtraLine = (
+    payout: Payout,
+    line: { groupId: string; name: string; actual: number },
+): Payout => {
+    return {
+        ...payout,
+        lines: [
+            ...payout.lines,
+            { ...line, id: null, planned: 0, isUnplanned: true },
+        ],
+    };
+};
+
+/**
+ * Drops a line from the record. The server deletes whatever this leaves out.
+ *
+ * Only unplanned lines are ever offered up — a planned one is the forecast the
+ * payday was opened with, and losing that would leave nothing to compare against.
+ */
+export const withoutLine = (payout: Payout, index: number): Payout => {
+    return {
+        ...payout,
+        lines: payout.lines.filter((_, at) => at !== index),
     };
 };

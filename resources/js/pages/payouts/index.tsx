@@ -1,24 +1,30 @@
 import { Head, Link } from '@inertiajs/react';
-import { Check, ChevronDown } from 'lucide-react';
+import { Check, ChevronDown, Plus, X } from 'lucide-react';
 import { useState } from 'react';
 import { AmountInput } from '@/components/finance/amount-input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { useStoredBudgetPlan } from '@/hooks/use-budget-plan';
 import {
     setPayoutStatus,
     usePayoutDraft,
     useStoredPayouts,
 } from '@/hooks/use-payouts';
+import { allowanceGroupId } from '@/lib/budget';
 import { formatPeso, formatSigned } from '@/lib/currency';
 import type { Payout } from '@/lib/payout';
 import {
     incomeVariance,
     isFinalized,
     leftOver,
+    lineGroups,
     withActualIncome,
     withActualLine,
+    withExtraLine,
+    withoutLine,
 } from '@/lib/payout';
 import { cn } from '@/lib/utils';
 import { dashboard } from '@/routes';
@@ -141,6 +147,133 @@ function PayoutRow({ payout, onOpen }: { payout: Payout; onOpen: () => void }) {
 }
 
 /**
+ * Something that went out which the plan never forecast, put on the payday it
+ * came out of.
+ *
+ * This is for the one-off that moved the month — a monitor, a hospital visit —
+ * and deliberately not a running record of what gets bought day to day. The
+ * allowance already carries the coffee and the groceries as one figure per
+ * paycheck, so itemising them here would count the same money twice and pull the
+ * month's saving down with it.
+ *
+ * Folded away until asked for. A payday that went to plan should say the
+ * shortest possible thing, which is the rest of this card's argument too.
+ */
+function AddLine({
+    payout,
+    onAdd,
+}: {
+    payout: Payout;
+    onAdd: (line: { groupId: string; name: string; actual: number }) => void;
+}) {
+    const [open, setOpen] = useState(false);
+    const [groupId, setGroupId] = useState(allowanceGroupId);
+    const [name, setName] = useState('');
+    const [actual, setActual] = useState(0);
+
+    if (!open) {
+        return (
+            <Button
+                variant="ghost"
+                size="sm"
+                data-test={`payout-add-line-${payout.key}`}
+                onClick={() => setOpen(true)}
+                className="mt-3 -ml-2 text-muted-foreground"
+            >
+                <Plus aria-hidden />
+                Add a line
+            </Button>
+        );
+    }
+
+    return (
+        <div className="mt-3 rounded-lg border border-dashed border-border p-3">
+            <div className="flex flex-wrap items-end gap-3">
+                <div className="grid min-w-48 flex-1 gap-1.5">
+                    <Label htmlFor={`new-line-name-${payout.key}`}>
+                        What went out
+                    </Label>
+                    <Input
+                        id={`new-line-name-${payout.key}`}
+                        data-test={`payout-new-name-${payout.key}`}
+                        value={name}
+                        placeholder="Monitor"
+                        onChange={(event) => setName(event.target.value)}
+                    />
+                </div>
+                <div className="grid gap-1.5">
+                    <Label htmlFor={`new-line-amount-${payout.key}`}>
+                        Amount
+                    </Label>
+                    <AmountInput
+                        id={`new-line-amount-${payout.key}`}
+                        data-test={`payout-new-amount-${payout.key}`}
+                        value={actual}
+                        onValueChange={setActual}
+                        className="w-32"
+                    />
+                </div>
+            </div>
+
+            <div className="mt-3 grid gap-1.5">
+                <Label htmlFor={`new-line-group-${payout.key}`}>
+                    Where it came from
+                </Label>
+                <ToggleGroup
+                    id={`new-line-group-${payout.key}`}
+                    type="single"
+                    variant="outline"
+                    value={groupId}
+                    onValueChange={(value) => {
+                        if (value) {
+                            setGroupId(value);
+                        }
+                    }}
+                    className="w-full sm:w-auto"
+                >
+                    {lineGroups.map((group) => (
+                        <ToggleGroupItem
+                            key={group.id}
+                            value={group.id}
+                            data-test={`payout-new-group-${group.id}`}
+                            className="px-4"
+                        >
+                            {group.label}
+                        </ToggleGroupItem>
+                    ))}
+                </ToggleGroup>
+            </div>
+
+            <div className="mt-3 flex items-center gap-2">
+                <Button
+                    size="sm"
+                    data-test={`payout-confirm-line-${payout.key}`}
+                    /* A line with no name reads as nothing at all on the record. */
+                    disabled={name.trim() === ''}
+                    onClick={() => {
+                        onAdd({ groupId, name: name.trim(), actual });
+                        setName('');
+                        setActual(0);
+                        setGroupId(allowanceGroupId);
+                        setOpen(false);
+                    }}
+                >
+                    Add
+                </Button>
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    data-test={`payout-cancel-line-${payout.key}`}
+                    onClick={() => setOpen(false)}
+                >
+                    Cancel
+                </Button>
+            </div>
+        </div>
+    );
+}
+
+/**
  * One payday, open for review.
  *
  * Corrections are held in a draft rather than sent as they are typed: a payday
@@ -241,9 +374,15 @@ function PayoutDetail({ payout: stored }: { payout: Payout }) {
                                     <span className="block truncate text-sm">
                                         {line.name}
                                     </span>
-                                    <span className="block text-xs text-muted-foreground tabular-nums">
-                                        {formatPeso(line.planned)} planned
-                                    </span>
+                                    {line.isUnplanned ? (
+                                        <span className="mt-0.5 inline-flex rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-semibold text-amber-800 dark:text-amber-300">
+                                            Unplanned
+                                        </span>
+                                    ) : (
+                                        <span className="block text-xs text-muted-foreground tabular-nums">
+                                            {formatPeso(line.planned)} planned
+                                        </span>
+                                    )}
                                 </dt>
                                 <dd className="flex shrink-0 items-center gap-2">
                                     <Delta
@@ -266,6 +405,28 @@ function PayoutDetail({ payout: stored }: { payout: Payout }) {
                                         }
                                         className="w-32"
                                     />
+                                    {/*
+                                     * Only an unplanned line may go. A planned
+                                     * one is the forecast this payday opened
+                                     * with, and dropping it would leave the
+                                     * actual beside it with nothing to answer to.
+                                     */}
+                                    {line.isUnplanned && !finalized && (
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            data-test={`payout-remove-line-${payout.key}-${index}`}
+                                            aria-label={`Remove ${line.name}`}
+                                            onClick={() =>
+                                                update(
+                                                    withoutLine(payout, index),
+                                                )
+                                            }
+                                            className="text-muted-foreground"
+                                        >
+                                            <X aria-hidden />
+                                        </Button>
+                                    )}
                                 </dd>
                             </div>
                         );
@@ -276,6 +437,13 @@ function PayoutDetail({ payout: stored }: { payout: Payout }) {
                     <p className="rounded-lg bg-muted p-3 text-sm text-muted-foreground">
                         Nothing was planned against this paycheck.
                     </p>
+                )}
+
+                {!finalized && (
+                    <AddLine
+                        payout={payout}
+                        onAdd={(line) => update(withExtraLine(payout, line))}
+                    />
                 )}
             </div>
 
