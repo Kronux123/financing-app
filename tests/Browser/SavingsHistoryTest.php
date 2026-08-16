@@ -33,6 +33,25 @@ function planWithPayday(User $user, int $income = 2_500_000, int $rent = 900_000
     return $plan->refresh();
 }
 
+/**
+ * The same fixture with a savings line on the plan, so the calendar has a goal
+ * to grade its months against.
+ *
+ * A month reports income less living costs, never the savings lines, so this
+ * moves the goal without moving the ₱16,000 the settled month puts by. The line
+ * is added after `payouts:open` on purpose: the payday was opened from the plan
+ * as it stood, and the goal is read from the plan as it stands now.
+ */
+function planWithGoal(User $user, int $goal): BudgetPlan
+{
+    $plan = planWithPayday($user);
+
+    ExpenseItem::factory()->for($plan)->for($plan->paychecks()->firstOrFail())
+        ->create(['group' => ExpenseGroup::Savings, 'name' => 'Savings', 'amount' => $goal]);
+
+    return $plan;
+}
+
 /** The card key of the newest payday, the one the payouts page opens on. */
 function newestPaydayKey(): string
 {
@@ -159,6 +178,25 @@ test('hovering a download says what it will download', function () {
         ->assertNoJavaScriptErrors();
 });
 
+// A month card is the plan's goal and the month's figure side by side, so the
+// gap between them is stated outright rather than left to the tint.
+test('a settled month is graded against the goal on the plan', function () {
+    // ₱16,000 put by against a ₱20,000 goal: 80%, the "Close" tier.
+    planWithGoal($this->user, 2_000_000);
+    $key = newestPaydayKey();
+
+    $page = visit(route('payouts.index'));
+
+    $page->click("@payout-toggle-{$key}")
+        ->assertSeeIn("@payout-status-{$key}", 'Finalized')
+        ->click('@nav-dashboard')
+        ->click('View all months')
+        ->assertSee('80%')
+        ->assertSee('₱4,000')
+        ->assertSee('under goal')
+        ->assertNoJavaScriptErrors();
+});
+
 test('the savings calendar has no accessibility issues', function () {
     planWithPayday($this->user);
     $key = newestPaydayKey();
@@ -184,5 +222,47 @@ test('the savings calendar has no accessibility issues in dark mode', function (
         ->click('@nav-dashboard')
         ->click('View all months')
         ->wait(5)
+        ->assertMissing('@calendar-empty')
+        ->assertNoAccessibilityIssues();
+});
+
+/*
+ * The two above grade nothing: without a savings line on the plan there is no
+ * goal, so the cards stay plain. A graded card puts every figure on a tinted
+ * surface instead, which is where the contrast floor is actually at risk.
+ *
+ * Each mode takes a different tier, so the strongest wash of the three is
+ * checked against both themes between them: goal met is the heaviest tint, and
+ * behind is the one whose hue sits closest to the text it carries.
+ */
+test('a graded month has no accessibility issues', function () {
+    // ₱16,000 against a ₱10,000 goal: 160%, the "Goal met" tier.
+    planWithGoal($this->user, 1_000_000);
+    $key = newestPaydayKey();
+
+    $page = visit(route('payouts.index'));
+
+    $page->click("@payout-toggle-{$key}")
+        ->assertSeeIn("@payout-status-{$key}", 'Finalized')
+        ->click('@nav-dashboard')
+        ->click('View all months')
+        ->wait(5)
+        ->assertSee('160%')
+        ->assertNoAccessibilityIssues();
+});
+
+test('a graded month has no accessibility issues in dark mode', function () {
+    // ₱16,000 against a ₱40,000 goal: 40%, the "Behind" tier.
+    planWithGoal($this->user, 4_000_000);
+    $key = newestPaydayKey();
+
+    $page = visit(route('payouts.index'))->inDarkMode();
+
+    $page->click("@payout-toggle-{$key}")
+        ->assertSeeIn("@payout-status-{$key}", 'Finalized')
+        ->click('@nav-dashboard')
+        ->click('View all months')
+        ->wait(5)
+        ->assertSee('40%')
         ->assertNoAccessibilityIssues();
 });

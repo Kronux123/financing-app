@@ -222,6 +222,29 @@
 }
 
 /**
+ * A goal bar drawing itself in, on the savings calendar.
+ *
+ * scaleX rather than width: a transform never asks for layout, and it never
+ * touches a computed colour, which is the same reason `rise-on-scroll` moves
+ * instead of fading (see the note in `.ai/rules/js.md`). The bar settles at
+ * scale 1, so the rounded cap is undistorted by the time it is at rest.
+ */
+@keyframes goal-bar {
+    from {
+        transform: scaleX(0);
+    }
+}
+
+@utility goal-bar {
+    transform-origin: left;
+    animation: goal-bar 0.85s cubic-bezier(0.22, 1, 0.36, 1) both;
+
+    @media (prefers-reduced-motion: reduce) {
+        animation: none;
+    }
+}
+
+/**
  * A ruled grid, faded out where it would compete with text.
  *
  * The line colour is `--ring` rather than `--border`: at oklch lightness 0.269
