@@ -38,7 +38,10 @@ rather than stored, so it can never drift from the figures behind it.
 that morning. A scheduled command opens a record when the day comes round and
 copies the plan into it rather than pointing at it, so editing the plan later
 cannot rewrite what already happened. Correct what actually came out, then
-finalize the record. A payday falling on a Saturday or Sunday is paid on the
+finalize the record. Something the plan never forecast — a monitor, a hospital
+visit — can be added as a line of its own against the payday it came out of, and
+taken back off again while the record is still open; it is badged *Unplanned*
+wherever it appears. A payday falling on a Saturday or Sunday is paid on the
 Friday before it, and a day past the end of a short month is pulled back to the
 last one.
 
@@ -55,8 +58,11 @@ what counts as saved is income less what went out on living costs.
 
 **Savings calendar** — A January-to-December grid with a year switcher, covering
 the years your ledger actually reaches. Each cell shows the amount, its
-percentage of the monthly goal, and the peso gap to it. Months with no data are
-drawn as dashed outlines so an unrecorded month does not read as a bad one.
+percentage of the monthly goal, and the peso gap to it, graded behind, close or
+goal met against the scale below. Months with no data are drawn as dashed
+outlines so an unrecorded month does not read as a bad one, and a plan with no
+savings line drops the grading altogether rather than reporting every month as
+0% of nothing.
 
 **Exports** — Any settled month downloads from its cell in the calendar, as a
 spreadsheet or as a PDF, and the whole year as one workbook. The sheet is a real
@@ -243,10 +249,11 @@ npm run build && php artisan test --testsuite=Browser
 
 These cover both halves end to end — cadence switching, per-paycheck leftovers,
 group rollups, over-allocation, moving and removing expenses, the swept
-remainder surviving a save, opening and correcting a payday, the freeze that
-stops a finalized record following the plan, and a settled month reaching the
-dashboard. Every page is also asserted free of JavaScript errors and
-accessibility violations, in both light and dark mode.
+remainder surviving a save, opening and correcting a payday, putting something
+the plan never forecast on one and taking it back off, the freeze that stops a
+finalized record following the plan, and a settled month reaching the dashboard
+graded against its goal. Every page is also asserted free of JavaScript errors
+and accessibility violations, in both light and dark mode.
 
 A few quirks worth knowing before you add to that suite — the full list lives in
 `.ai/rules/browser.md`:
@@ -380,6 +387,17 @@ February still says what February cost. The same principle decides what a Form
 Request will accept — `planned` is refused on the way in, because a record of the
 forecast is worth nothing if the forecast can be edited later.
 
+**An unplanned line is for the one-off, not for the groceries.** Adding a line
+to a payday records something the forecast never saw coming — a monitor, a
+hospital visit. It is deliberately not a running log of daily spending: allowance is one
+figure per paycheck by design, and a month's saving is read as income less
+payables less allowance, so itemising the coffee alongside it counts the same
+money twice and drags the reported saving down with it. If per-transaction
+spending is ever wanted it belongs beside the app, reporting one monthly total
+into allowance, rather than threaded through `payout_lines`. The flag itself is
+carried on the wire rather than inferred, because a `planned` of nought says
+nothing on its own about whether a payable stood behind the row.
+
 **The swept remainder is derived, never stored.** A paycheck set to save what is
 left over gets that line rebuilt on every edit and dropped before saving. Storing
 it once looked simpler and was wrong: the reloaded row read as an ordinary
@@ -410,11 +428,11 @@ orange and green converge for red-green colour blindness. The steps are defined
 as `--goal-behind`, `--goal-close` and `--goal-met` in `resources/css/app.css`,
 selected per mode against each card surface, and validated all-pairs.
 
-Colour never carries meaning alone. It appears as a dot, a bar or a 10% tint,
-while the exact percentage is always printed alongside and text stays on ink
-tokens. The PDF's proportion bar reuses those same three steps, for the same
-reason and with the same relief: every segment is named, percentaged and totalled
-in the key beneath it.
+Colour never carries meaning alone. It appears as a dot, a bar, a hairline or a
+corner wash, while the exact percentage is always printed alongside and text
+stays on ink tokens. The PDF's proportion bar reuses those same three steps, for
+the same reason and with the same relief: every segment is named, percentaged
+and totalled in the key beneath it.
 
 The budget planner reuses the same tokens with inverted thresholds — over 100%
 allocated is orange, 90–99% blue, under 90% green — because overspending a
