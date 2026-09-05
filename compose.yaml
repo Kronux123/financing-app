@@ -14,7 +14,7 @@ services:
     <<: *app
     ports:
       - "8080:80"
-    mem_limit: 512m
+    mem_limit: 1g
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost/up"]
       interval: 10s
@@ -24,12 +24,14 @@ services:
   
   scheduler:
     <<: *app
+    mem_limit: 256m
     command: [ "php", "artisan", "schedule:work" ]
     healthcheck:
       disable: true
 
   queue:
     <<: *app
+    mem_limit: 256m
     command: [ "php", "artisan", "queue:work", "--tries=3", "--max-time=3600" ]
     healthcheck:
       disable: true
