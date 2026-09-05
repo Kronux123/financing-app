@@ -1,0 +1,58 @@
+name: kept
+
+services:
+  app:
+    env_file: [.env.docker]
+    build: .
+    image: kept:local
+    ports:
+      - "8080:80"
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/up"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+  
+  scheduler:
+    build: .
+    image: kept:local
+    env_file: [.env.docker]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    command: [ "php", "artisan", "schedule:work" ]
+    healthcheck:
+      disable: true
+
+  queue:
+    build: .
+    image: kept:local
+    env_file: [.env.docker]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    command: [ "php", "artisan", "queue:work", "--tries=3", "--max-time=3600" ]
+    healthcheck:
+      disable: true
+
+  postgres:
+    image: postgres:17-alpine
+    env_file: [.env.docker]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  pgdata:
