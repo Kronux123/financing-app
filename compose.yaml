@@ -1,16 +1,20 @@
 name: kept
 
+x-app: &app
+  build: .
+  image: kept:local
+  env_file: [.env.docker]
+  depends_on:
+    postgres:
+      condition: service_healthy
+  restart: unless-stopped
+
 services:
   app:
-    env_file: [.env.docker]
-    build: .
-    image: kept:local
+    <<: *app
     ports:
       - "8080:80"
-    restart: unless-stopped
-    depends_on:
-      postgres:
-        condition: service_healthy
+    mem_limit: 512m
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost/up"]
       interval: 10s
@@ -19,25 +23,13 @@ services:
       start_period: 30s
   
   scheduler:
-    build: .
-    image: kept:local
-    env_file: [.env.docker]
-    depends_on:
-      postgres:
-        condition: service_healthy
-    restart: unless-stopped
+    <<: *app
     command: [ "php", "artisan", "schedule:work" ]
     healthcheck:
       disable: true
 
   queue:
-    build: .
-    image: kept:local
-    env_file: [.env.docker]
-    depends_on:
-      postgres:
-        condition: service_healthy
-    restart: unless-stopped
+    <<: *app
     command: [ "php", "artisan", "queue:work", "--tries=3", "--max-time=3600" ]
     healthcheck:
       disable: true
