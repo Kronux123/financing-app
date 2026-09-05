@@ -47,25 +47,40 @@ Steps 1 and 2 are done and committed (`226daa4`, `a52ebf7`, `23891b3`).
 4. ~~`.env.docker.example`.~~ Done. `.env.docker` is gitignored, so without a template a fresh clone
    fails on a missing `env_file` before anything else. Doubles as the variable list for step 7.
 
-### Deployment (an afternoon, mostly not Docker)
+### Deployment — AWS (not started, and not the current focus)
 
-5. Commit, push to a git remote — Coolify deploys from a repo.
-6. Provision the VPS, install Coolify (Singapore box, ~$15/mo).
-7. Configure in Coolify: env vars, domain, TLS, and `php artisan migrate --force` as the
-   **pre-deployment command** — deliberately not in the entrypoint, or three containers race each other.
-8. **Real SMTP before the first signup.** ⚠️ Everything except the landing page is behind
+> **Target changed 2026-09-06 to AWS**, reversing the earlier VPS + Coolify plan. Everything below
+> that named Coolify has been rewritten. Docker for prod and dev comes first.
+
+**Decide this before any deployment work — it changes the shape of everything after:**
+
+| If it's… | then `compose.yaml` is… |
+|---|---|
+| ECS / Fargate / App Runner | **local-only.** Images go to ECR; task definitions carry the real config, and the three roles become separate task definitions or services. |
+| EC2 / Lightsail Containers | **production.** It runs roughly as-is on the instance. |
+
+The Dockerfile is the same either way, which is why Docker work isn't blocked on this.
+
+5. Push to a git remote. Nothing on AWS builds from a local folder.
+6. Choose the service (table above), then provision. Region is still open — Singapore vs a US
+   region depends on whether job applications target PH or US companies.
+7. Decide **RDS vs a Postgres container.** AWS pulls hard toward RDS; RDS is also where the cost is.
+8. Run `php artisan migrate --force` as a **pre-deployment/one-off task, never in the entrypoint** —
+   three containers would race each other to migrate the same database at boot.
+9. **Real SMTP before the first signup.** ⚠️ Everything except the landing page is behind
    `auth` + `verified`. With `MAIL_MAILER=log` you register, never get the email, and are locked out.
-9. Postgres backups. A volume on one VPS is not a backup.
-10. Store `APP_KEY` outside the host. 2FA secrets and passkeys are encrypted with it — lose it and
-   every user is permanently locked out of 2FA. The passkey domain is also one-way: WebAuthn binds
-   credentials to the hostname, so the production subdomain must be final before anyone enrolls one.
-11. **Size the VPS against the measured memory budget, not a guess.** `1g` + `256m` + `256m` is
-    1.5 GB before Postgres or the OS, so a 2 GB box does not fit. Buy 4 GB, or move the pdf render
-    to a queued job first and shrink `app`. Decide before provisioning — it changes what you pay for.
-12. **Build in CI and push to a registry** — only if deploys start hurting. Coolify builds on the
-    VPS by default, so the box runs `composer install`, `npm ci` and `npm run build` while also
-    serving the app; on a small droplet `npm run build` is the usual OOM culprit. Parked
-    deliberately: fewer moving parts beats faster deploys until a deploy actually fails.
+   (SES is the native answer here, and it starts in a sandbox that only sends to verified addresses.)
+10. Postgres backups. A container volume is not a backup; neither is a single-AZ RDS instance you
+    have never restored from.
+11. Store `APP_KEY` outside the host — Secrets Manager or SSM Parameter Store. 2FA secrets and
+    passkeys are encrypted with it: lose it and every user is permanently locked out of 2FA. The
+    passkey domain is one-way too, since WebAuthn binds credentials to the hostname, so the
+    production domain must be final before anyone enrolls one.
+12. **Size the instance against the measured memory budget, not a guess.** `1g` + `256m` + `256m` is
+    1.5 GB before Postgres or the OS. On Fargate that is a task-size line item you pay for monthly;
+    moving the pdf render to a queued job would let the web task shrink.
+13. **Build in CI, push to ECR.** On ECS this is mandatory rather than an optimization — there is no
+    build-on-the-box option. `npm run build` is the memory-hungry step, so it wants a real runner.
 
 ## Commands worth remembering
 
