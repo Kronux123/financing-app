@@ -1,6 +1,6 @@
 # Docker setup — where we left off
 
-Last worked on: 2026-09-04. Hand-written for learning, not generated — keep it that way.
+Last worked on: 2026-09-06. Hand-written for learning, not generated — keep it that way.
 
 ## Done and verified
 
@@ -9,14 +9,17 @@ Last worked on: 2026-09-04. Hand-written for learning, not generated — keep it
 | `Dockerfile` | 3 stages (`base` → `build` → `final`), Alpine/musl, 1.48 GB |
 | `.dockerignore` | excludes `node_modules`, `vendor`, `.git`, `.env`, sqlite, `bootstrap/cache` |
 | `docker/entrypoint.sh` | caches config/routes/views at boot, then `exec docker-php-entrypoint "$@"` |
-| `compose.yaml` | `app` + `postgres`, healthchecks, `pgdata` volume |
+| `compose.yaml` | `app` + `scheduler` + `queue` + `postgres`; `x-app` anchor, per-service `mem_limit`, `pgdata` volume |
 | `.env.docker` | runtime config — **gitignored, holds the DB password** |
+| `.env.docker.example` | committed template; the same keys with the three secrets blank |
 
 Proven working locally:
 
 - `GET /` → 200, `GET /up` → 200, Vite assets served
 - Chromium renders a PDF as root (`--no-sandbox` + `font-liberation` both required)
 - `php artisan schedule:list` runs through an overridden command — the three-role design works
+- A job dispatched from `app` ran in the `queue` container — the two share nothing but Postgres, which is why `QUEUE_CONNECTION=database` is what makes the split work
+- A pdf export peaks at 744 MiB in `app`; `1g` clears it with `memory.events` `max 0`
 - Config caches at **container start** against the real environment (`APP_ENV=production` confirmed in `bootstrap/cache/config.php`)
 
 ## Next steps
@@ -33,25 +36,33 @@ Steps 1 and 2 are done and committed (`226daa4`, `a52ebf7`, `23891b3`).
    `depends_on`, `restart`. `healthcheck` deliberately stayed *out* of the anchor: it differs in
    kind across the three roles, not just in value, and `<<` replaces whole keys rather than
    merging them. `mem_limit` added per service — `1g` / `256m` / `256m`, Postgres unbounded.
-3. **Dev override** (optional, still open) — `compose.override.yaml` that mounts source and skips
-   config caching, for an edit-and-refresh loop. Skippable: Herd already covers local development.
+3. **Dev override** — *deferred, deliberately.* A `compose.override.yaml` that mounts source and
+   skips config caching would help a second developer, and nobody else is on this yet. It is also
+   bigger than it looks: `vite.config.ts` runs Inertia, the React compiler and Wayfinder, so a real
+   edit-and-refresh loop needs the Vite dev server published and reachable from both the browser and
+   the container, plus a guard around `entrypoint.sh`'s unconditional `config:cache`.
+   Worth knowing what it is *not* for: an override makes the container **less** like production
+   (mounted source, no config cache, dev deps, debug on). For reproducing a production bug, plain
+   `compose.yaml` is already the better tool — it runs the same artifact Coolify will.
+4. ~~`.env.docker.example`.~~ Done. `.env.docker` is gitignored, so without a template a fresh clone
+   fails on a missing `env_file` before anything else. Doubles as the variable list for step 7.
 
 ### Deployment (an afternoon, mostly not Docker)
 
-4. Commit, push to a git remote — Coolify deploys from a repo.
-5. Provision the VPS, install Coolify (Singapore box, ~$15/mo).
-6. Configure in Coolify: env vars, domain, TLS, and `php artisan migrate --force` as the
+5. Commit, push to a git remote — Coolify deploys from a repo.
+6. Provision the VPS, install Coolify (Singapore box, ~$15/mo).
+7. Configure in Coolify: env vars, domain, TLS, and `php artisan migrate --force` as the
    **pre-deployment command** — deliberately not in the entrypoint, or three containers race each other.
-7. **Real SMTP before the first signup.** ⚠️ Everything except the landing page is behind
+8. **Real SMTP before the first signup.** ⚠️ Everything except the landing page is behind
    `auth` + `verified`. With `MAIL_MAILER=log` you register, never get the email, and are locked out.
-8. Postgres backups. A volume on one VPS is not a backup.
-9. Store `APP_KEY` outside the host. 2FA secrets and passkeys are encrypted with it — lose it and
+9. Postgres backups. A volume on one VPS is not a backup.
+10. Store `APP_KEY` outside the host. 2FA secrets and passkeys are encrypted with it — lose it and
    every user is permanently locked out of 2FA. The passkey domain is also one-way: WebAuthn binds
    credentials to the hostname, so the production subdomain must be final before anyone enrolls one.
-10. **Size the VPS against the measured memory budget, not a guess.** `1g` + `256m` + `256m` is
+11. **Size the VPS against the measured memory budget, not a guess.** `1g` + `256m` + `256m` is
     1.5 GB before Postgres or the OS, so a 2 GB box does not fit. Buy 4 GB, or move the pdf render
     to a queued job first and shrink `app`. Decide before provisioning — it changes what you pay for.
-11. **Build in CI and push to a registry** — only if deploys start hurting. Coolify builds on the
+12. **Build in CI and push to a registry** — only if deploys start hurting. Coolify builds on the
     VPS by default, so the box runs `composer install`, `npm ci` and `npm run build` while also
     serving the app; on a small droplet `npm run build` is the usual OOM culprit. Parked
     deliberately: fewer moving parts beats faster deploys until a deploy actually fails.
