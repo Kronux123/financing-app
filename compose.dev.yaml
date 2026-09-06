@@ -1,0 +1,21 @@
+x-dev: &dev
+  volumes:
+    - .:/app
+  environment:
+    APP_ENV: local
+    APP_DEBUG: "true"
+    LOG_LEVEL: debug
+
+
+
+services:
+  app:
+    <<: *dev
+    
+  scheduler:
+    <<: *dev
+
+  queue:
+    <<: *dev
+
+
