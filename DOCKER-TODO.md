@@ -2,6 +2,119 @@
 
 Last worked on: 2026-09-06. Hand-written for learning, not generated — keep it that way.
 
+---
+
+## ⏸ RESUME HERE — mid-migration to WSL2
+
+**Decision (2026-09-06):** development moves into WSL2 and **Herd is dropped for this project**.
+Two reasons: Herd runs on SQLite while production is Postgres (`LIKE` case-sensitivity, type
+affinity and JSON operators all differ — bugs that cannot show up locally), and bind-mounting from
+`C:\` into WSL2 is slow for PHP's many-small-files access pattern. Same habit applies to the future
+Next.js/NestJS work; **not** to C#, where Windows-native is the better default.
+
+Nothing has been moved yet. `C:\Users\Rylef\Herd\financing-app` is untouched and stays until the
+WSL copy is verified. WSL is Ubuntu 26.04, user `ryle`, home `/home/ryle`, 16 CPUs, 15 GiB.
+
+### 0. Blocking, in the GUI
+
+**Docker Desktop → Settings → Resources → WSL Integration → enable `Ubuntu` → Apply & Restart.**
+
+Verify from Windows — it must print `/usr/bin/docker`, *not* a `/mnt/c/...` path:
+
+```powershell
+wsl -d Ubuntu -- bash -lc 'command -v docker'
+```
+
+Without this, `docker` inside WSL is Windows `docker.exe` found via PATH interop, and `-v $PWD:/app`
+resolves against the *Windows* filesystem — silently mounting the wrong thing.
+
+### 1. Clone into the Linux filesystem
+
+Must live under `/home/ryle`, **never `/mnt/c`** — `/mnt/c` is the same slow boundary with extra steps.
+Cloning from the local folder rather than GitHub because 7 commits are unpushed.
+
+```sh
+mkdir -p ~/code
+git clone /mnt/c/Users/Rylef/Herd/financing-app ~/code/kept
+cd ~/code/kept
+git remote set-url origin https://github.com/Kronux123/financing-app.git
+```
+
+### 2. Carry the gitignored files git cannot
+
+`.env.docker` is the critical one — without it `docker compose up` fails on a missing `env_file`.
+
+```sh
+SRC=/mnt/c/Users/Rylef/Herd/financing-app
+cp "$SRC/.env.docker" "$SRC/.env" "$SRC/RELEASE-V1.md" ~/code/kept/
+cp "$SRC/database/database.sqlite" ~/code/kept/database/
+mkdir -p ~/code/kept/.claude && cp "$SRC/.claude/settings.local.json" ~/code/kept/.claude/
+cp "$SRC"/storage/app/backup-*.json ~/code/kept/storage/app/
+```
+
+Deliberately **not** copied: `vendor/`, `node_modules/` (reinstall — wrong platform otherwise),
+`resources/js/{actions,routes,wayfinder}/` and `storage/framework/views/` (all regenerated).
+
+### 3. Node in Ubuntu (nvm), version 22 to match the Dockerfile
+
+```sh
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
+exec bash -l
+nvm install 22 && node -v
+```
+
+### 4. Dependencies — no PHP needed in Ubuntu
+
+```sh
+cd ~/code/kept
+docker run --rm -v "$PWD":/app -w /app composer:2 install
+npm ci
+```
+
+### 5. Boot from the WSL path
+
+⚠️ **Stop the Windows-side stack first.** Docker Desktop shares one daemon, and both sides use the
+project name `kept` — so they are the *same* containers and the *same* `kept_pgdata` volume. Running
+`up` from WSL while Windows' stack is up just recreates them with different mounts, which is
+confusing rather than broken. Upside: the seeded demo data carries over for free.
+
+```sh
+# from Windows first:  docker compose down
+docker compose up -d --build
+docker compose ps
+```
+
+### 6. Measure — the number that justifies the move
+
+```sh
+curl -o /dev/null -s -w 'docker: %{time_total}s\n' http://localhost:8080/
+```
+
+Compare against the Herd URL from Windows. If the WSL figure is close to Herd's, the move paid off.
+
+### 7. Then finish the dev override (unfinished from before the move)
+
+- Write `docker/entrypoint.dev.sh`: `set -e`, then `config:clear` / `route:clear` / `view:clear`
+  (not `optimize:clear` — that hits the database on every boot), then `exec docker-php-entrypoint "$@"`.
+- Add `entrypoint: ["sh", "/app/docker/entrypoint.dev.sh"]` to `compose.dev.yaml`'s `x-dev` anchor.
+  Invoke via `sh` so a bind-mounted file's exec bit never matters.
+- **Compose's `entrypoint:` also clears the image's `CMD`** — so `app` needs an explicit `command:`
+  with the FrankenPHP args (`--config /etc/frankenphp/Caddyfile --adapter caddyfile`). `scheduler`
+  and `queue` already declare their own `command:`, so they should be unaffected — verify rather
+  than assume.
+- Why it matters: `entrypoint.sh` caches config at boot, and with the mount that writes
+  `bootstrap/cache/config.php` into the *source tree*, baked with `DB_HOST=postgres`.
+
+### Still open after that
+
+- **Vite/HMR.** `npm run dev` on the WSL host is simplest — the browser resolves `localhost:5173`
+  itself, so no Vite config change is needed. The catch: the mount shadows the image's built assets
+  with the host's `public/build`, which is currently **empty**, so without either Vite running or a
+  local `npm run build` you get `Unable to locate file in Vite manifest`.
+- Delete `C:\Users\Rylef\Herd\financing-app` only after all of the above passes.
+
+---
+
 ## Done and verified
 
 | File | State |
