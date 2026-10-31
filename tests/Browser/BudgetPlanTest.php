@@ -489,12 +489,13 @@ test('the dashboard leads with total saved and gives the fund its own card', fun
         ->assertNoJavaScriptErrors();
 });
 
-test('the dashboard hides the fund card until a plan exists', function () {
+test('the dashboard shows no figures until a plan exists', function () {
     $page = visit(route('dashboard'));
 
-    $page->assertSee('These are sample figures')
-        ->assertSeeIn('@dashboard-saved', '₱82,400')
+    $page->assertPresent('@dashboard-empty')
+        ->assertMissing('@dashboard-saved')
         ->assertMissing('@dashboard-fund')
+        ->assertDontSee('₱')
         ->assertNoJavaScriptErrors();
 });
 
@@ -512,18 +513,22 @@ test('the dashboard reflects a saved plan', function () {
     $page->click('Back to dashboard')
         ->assertPathIs('/dashboard')
         ->assertSee('Savings overview')
-        ->assertDontSee('These are sample figures')
+        ->assertMissing('@dashboard-empty')
         ->assertSee('Planned by group')
         ->assertSee('₱15,000')
         ->assertSee('₱10,000')
+        // A plan alone opens no payday, so there is nothing in the log yet.
+        ->assertSeeIn('@savings-empty', 'No month has been settled yet')
+        ->assertSeeIn('@activity-empty', 'No activity yet')
         ->assertNoJavaScriptErrors();
 });
 
 test('the dashboard prompts for a plan when none is saved', function () {
     $page = visit(route('dashboard'));
 
-    $page->assertSee('These are sample figures')
-        ->assertSee('Spending categories')
+    $page->assertSeeIn('@dashboard-empty', 'Your overview fills in as you go')
+        ->click('@build-plan')
+        ->assertPathIs('/finance')
         ->assertNoJavaScriptErrors();
 });
 

@@ -1,21 +1,27 @@
 <?php
 
+use App\Models\BudgetPlan;
 use App\Models\User;
 
 beforeEach(function () {
-    $this->actingAs(User::factory()->create());
+    $this->user = User::factory()->create();
+
+    $this->actingAs($this->user);
 });
 
-test('the dashboard renders every card', function () {
+test('the dashboard renders every card once there is a plan', function () {
+    BudgetPlan::factory()->for($this->user)->withPaychecks()->withPayables()->create();
+
     $page = visit(route('dashboard'));
 
     $page->assertSee('Savings overview')
+        ->assertMissing('@dashboard-empty')
         ->assertSee('Total saved')
         ->assertSee('Monthly expenses')
         ->assertSee('Outstanding debt')
         ->assertSee('Projected cashflow')
         ->assertSee('Monthly savings')
-        ->assertSee('Spending categories')
+        ->assertSee('Planned by group')
         ->assertSee('Recent activity')
         ->assertNoJavaScriptErrors();
 });
@@ -109,10 +115,16 @@ test('projected cashflow says nothing ends when no payable has a date', function
         ->assertSee('Nothing ends in the next 12 months');
 });
 
+/*
+ * Both states are checked. Without a plan the page is the onboarding card, and
+ * with one it is the full overview, empty states for the chart and the log
+ * included — a fresh plan has settled nothing yet.
+ */
 test('the dashboard has no accessibility issues', function () {
     $page = visit(route('dashboard'));
 
-    $page->assertNoAccessibilityIssues();
+    $page->assertPresent('@dashboard-empty')
+        ->assertNoAccessibilityIssues();
 });
 
 // The card icons sit on tinted surfaces that carry their own dark steps, so the
@@ -120,5 +132,24 @@ test('the dashboard has no accessibility issues', function () {
 test('the dashboard has no accessibility issues in dark mode', function () {
     $page = visit(route('dashboard'))->inDarkMode();
 
-    $page->assertNoAccessibilityIssues();
+    $page->assertPresent('@dashboard-empty')
+        ->assertNoAccessibilityIssues();
+});
+
+test('the dashboard with a plan has no accessibility issues', function () {
+    BudgetPlan::factory()->for($this->user)->withPaychecks()->withPayables()->create();
+
+    $page = visit(route('dashboard'));
+
+    $page->assertSee('Planned by group')
+        ->assertNoAccessibilityIssues();
+});
+
+test('the dashboard with a plan has no accessibility issues in dark mode', function () {
+    BudgetPlan::factory()->for($this->user)->withPaychecks()->withPayables()->create();
+
+    $page = visit(route('dashboard'))->inDarkMode();
+
+    $page->assertSee('Planned by group')
+        ->assertNoAccessibilityIssues();
 });

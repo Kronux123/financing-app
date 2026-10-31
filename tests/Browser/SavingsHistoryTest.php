@@ -67,6 +67,11 @@ test('the dashboard says nothing is settled before a payday is finalized', funct
 
     $page->assertSee('Monthly savings')
         ->assertSeeIn('@savings-empty', 'No month has been settled yet')
+        // The open payday is in the log already, marked as not yet settled.
+        ->assertMissing('@activity-empty')
+        ->assertPresent('@activity-row')
+        ->assertSee('· Pending')
+        ->assertSee('Rent')
         ->assertNoJavaScriptErrors();
 });
 

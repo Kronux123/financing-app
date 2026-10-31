@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Actions\Payouts\ActivityLog;
 use App\Actions\Payouts\MonthlySavings;
+use App\Http\Resources\ActivityResource;
 use App\Http\Resources\MonthlySavingsResource;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -17,12 +19,23 @@ use Inertia\Response;
  */
 class DashboardController extends Controller
 {
-    public function __construct(private readonly MonthlySavings $monthlySavings) {}
+    /** Enough of the log to see what moved lately; the activity page has the rest. */
+    public const RECENT_ACTIVITY_ROWS = 5;
+
+    public function __construct(
+        private readonly MonthlySavings $monthlySavings,
+        private readonly ActivityLog $activityLog,
+    ) {}
 
     public function index(Request $request): Response
     {
+        $recentActivity = $this->activityLog->handle($request->user(), self::RECENT_ACTIVITY_ROWS);
+
         return Inertia::render('dashboard/index', [
             'savings' => $this->savings($request),
+            // The newest rows of the same log the activity page reads, so the
+            // two can never disagree about what happened.
+            'recentActivity' => ActivityResource::collection($recentActivity->items())->resolve($request),
         ]);
     }
 

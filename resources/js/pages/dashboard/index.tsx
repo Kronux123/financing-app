@@ -6,17 +6,20 @@ import {
     ChartColumn,
     ChartPie,
     CreditCard,
-    Info,
     Landmark,
     PiggyBank,
     ShieldCheck,
     TrendingUp,
 } from 'lucide-react';
+import { DashboardOnboarding } from '@/components/dashboard/dashboard-onboarding';
+import { EmptyPanel } from '@/components/dashboard/empty-panel';
 import { SavingsChart } from '@/components/dashboard/savings-chart';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useStoredBudgetPlan } from '@/hooks/use-budget-plan';
 import { useSavingsHistory } from '@/hooks/use-savings';
+import type { Activity as ActivityRow } from '@/lib/activities';
+import { formatActivityDate } from '@/lib/activities';
 import type { BudgetPlan, FreeingUp } from '@/lib/budget';
 import {
     freeingUpWithin,
@@ -33,42 +36,13 @@ import { lastMonths, monthShortLabel } from '@/lib/savings';
 import { dashboard } from '@/routes';
 import dashboardRoutes from '@/routes/dashboard';
 import { edit as financeRoute } from '@/routes/finance';
-
-/**
- * Figures the budget plan cannot supply yet — they need balances and history
- * rather than a forward-looking plan. These stay sample data until the backend
- * release gives them somewhere real to come from.
- */
-const sampleTotalSaved = 82_400;
-const sampleMonthlyGoal = 7_200;
-const sampleFreesUp = 2_500;
+import { index as payoutsRoute } from '@/routes/payouts';
 
 /** How far ahead the cashflow tile looks for payables that finish. */
 const cashflowWindowMonths = 12;
 
-const sampleSupportingStats = [
-    { label: 'Average monthly save', value: 6_880 },
-    { label: 'Emergency buffer', value: 18_200 },
-];
-
 /** How much history the chart shows. Enough to read a trend, few enough to fit. */
 const chartMonths = 6;
-
-const sampleOutstandingDebt = -16_780;
-
-const recentActivity = [
-    { title: 'Mortgage payment', amount: -1_250, when: 'Today' },
-    { title: 'Spotify subscription', amount: -15, when: 'Yesterday' },
-    { title: 'Salary deposit', amount: 5_800, when: '2 days ago' },
-    { title: 'Credit card payment', amount: -420, when: '4 days ago' },
-];
-
-const sampleCategories = [
-    { name: 'Housing', amount: 1_450 },
-    { name: 'Utilities', amount: 630 },
-    { name: 'Groceries', amount: 540 },
-    { name: 'Transport', amount: 305 },
-];
 
 const categoryColors = [
     'bg-cyan-500',
@@ -96,12 +70,11 @@ type DerivedFigures = {
     /** Negative, like the other outgoing figures. Zero once nothing is owed. */
     outstandingDebt: number;
     categories: { name: string; amount: number; color: string }[];
-    /** Both balances together once a plan exists, sample data before that. */
+    /** Both balances together. */
     totalSaved: number;
     savedPerMonth: number;
     savingsBreakdown: { label: string; value: number }[];
-    /** Null without a plan — there is nothing to size a fund against. */
-    fund: FundFigures | null;
+    fund: FundFigures;
 };
 
 const withColors = (
@@ -144,28 +117,10 @@ const cashflowNoteFor = ({ ending }: FreeingUp): string => {
 };
 
 /**
- * Reads the saved budget plan where it can, and falls back to the sample
- * figures so a first visit never renders an empty dashboard.
+ * Everything the overview shows, read off the saved plan. Only called once a
+ * plan exists — before that the page shows the onboarding state instead.
  */
-const deriveFigures = (
-    plan: BudgetPlan | null,
-    today: Date,
-): DerivedFigures => {
-    if (!plan || !isPlanPopulated(plan)) {
-        return {
-            monthlyGoal: sampleMonthlyGoal,
-            monthlyExpenses: -4_125,
-            projectedCashflow: sampleFreesUp,
-            cashflowNote: 'when an installment ends',
-            outstandingDebt: sampleOutstandingDebt,
-            categories: withColors(sampleCategories),
-            totalSaved: sampleTotalSaved,
-            savedPerMonth: sampleMonthlyGoal,
-            savingsBreakdown: sampleSupportingStats,
-            fund: null,
-        };
-    }
-
+const deriveFigures = (plan: BudgetPlan, today: Date): DerivedFigures => {
     const { allocated } = planTotals(plan);
     const savingsGroup = plan.groups.find(
         (group) => group.id === savingsGroupId,
@@ -175,11 +130,7 @@ const deriveFigures = (
     const freeingUp = freeingUpWithin(plan, cashflowWindowMonths, today);
 
     return {
-        /**
-         * What the plan intends to put by each month, swept remainder included.
-         * No sample fallback once there is a plan: the goal line sits against
-         * real history now, and a made-up target would misread every bar.
-         */
+        /** What the plan intends to put by each month, swept remainder included. */
         monthlyGoal: plannedSavings,
         monthlyExpenses: -(allocated - plannedSavings),
         projectedCashflow: freeingUp.amount,
@@ -229,10 +180,65 @@ const fundNote = ({ target, gap, monthsToFill }: FundFigures): string => {
         : `${formatPeso(gap)} to go · nothing going to savings yet.`;
 };
 
-export default function Dashboard() {
+/** Heights of the ghost bars, as a share of their frame. */
+const ghostBars = [40, 64, 52, 80, 68, 92];
+
+/** The chart's outline with nothing in it, so the empty card keeps its shape. */
+function ChartGhost() {
+    return (
+        <div
+            aria-hidden
+            className="mb-2 flex h-16 w-full max-w-xs items-end gap-2 border-b border-border px-2"
+        >
+            {ghostBars.map((height, index) => (
+                <div
+                    key={index}
+                    className="flex-1 rounded-t-sm border border-b-0 border-dashed border-muted-foreground/30 bg-muted/40"
+                    style={{ height: `${height}%` }}
+                />
+            ))}
+        </div>
+    );
+}
+
+function OverviewHeader() {
+    return (
+        <header className="flex flex-wrap items-baseline justify-between gap-3">
+            <h1 className="text-2xl font-semibold tracking-tight">
+                Savings overview
+            </h1>
+            <p className="text-sm text-muted-foreground">
+                {new Date().toLocaleDateString('en-US', {
+                    month: 'long',
+                    year: 'numeric',
+                })}
+            </p>
+        </header>
+    );
+}
+
+export default function Dashboard({
+    recentActivity,
+}: {
+    /** The newest rows of the activity log, newest first. */
+    recentActivity: ActivityRow[];
+}) {
     const plan = useStoredBudgetPlan();
     const history = useSavingsHistory();
-    const hasPlan = plan !== null && isPlanPopulated(plan);
+
+    if (plan === null || !isPlanPopulated(plan)) {
+        return (
+            <>
+                <Head title="Dashboard" />
+
+                <div className="flex w-full flex-col gap-6 p-4 md:p-6">
+                    <OverviewHeader />
+                    <DashboardOnboarding />
+                </div>
+            </>
+        );
+    }
+
     /** Real months, however few — a finalized payday is the only source. */
     const chartData = lastMonths(history, chartMonths).map((entry) => ({
         month: monthShortLabel(entry.month),
@@ -259,7 +265,7 @@ export default function Dashboard() {
         {
             label: 'Monthly expenses',
             value: monthlyExpenses,
-            note: hasPlan ? 'Planned outgoing' : 'Outgoing this month',
+            note: 'Planned outgoing',
             icon: CreditCard,
         },
         {
@@ -281,37 +287,7 @@ export default function Dashboard() {
             <Head title="Dashboard" />
 
             <div className="flex w-full flex-col gap-6 p-4 md:p-6">
-                <header className="flex flex-wrap items-baseline justify-between gap-3">
-                    <h1 className="text-2xl font-semibold tracking-tight">
-                        Savings overview
-                    </h1>
-                    <p className="text-sm text-muted-foreground">
-                        {new Date().toLocaleDateString('en-US', {
-                            month: 'long',
-                            year: 'numeric',
-                        })}
-                    </p>
-                </header>
-
-                {!hasPlan && (
-                    <Card>
-                        <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4">
-                            <p className="flex items-start gap-2 text-sm text-muted-foreground">
-                                <Info
-                                    aria-hidden
-                                    className="mt-0.5 size-4 shrink-0"
-                                />
-                                These are sample figures. Set up your budget
-                                plan to see your own numbers here.
-                            </p>
-                            <Button variant="secondary" size="sm" asChild>
-                                <Link href={financeRoute()}>
-                                    Build your plan
-                                </Link>
-                            </Button>
-                        </CardContent>
-                    </Card>
-                )}
+                <OverviewHeader />
 
                 <Card>
                     <CardContent className="flex flex-col gap-6 p-6 lg:flex-row lg:items-end lg:justify-between">
@@ -348,58 +324,56 @@ export default function Dashboard() {
                     </CardContent>
                 </Card>
 
-                {fund && (
-                    <Card>
-                        <CardHeader className="flex flex-row items-center justify-between gap-4">
-                            <CardTitle className="flex items-center gap-2 text-base">
-                                <ShieldCheck
-                                    aria-hidden
-                                    className="size-4 text-muted-foreground"
-                                />
-                                Emergency fund
-                            </CardTitle>
-                            <Button variant="ghost" size="sm" asChild>
-                                <Link href={financeRoute()}>Adjust</Link>
-                            </Button>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-                                <p
-                                    data-test="dashboard-fund"
-                                    className="text-2xl font-semibold tracking-tight tabular-nums"
-                                >
-                                    {formatPeso(fund.balance)}
-                                </p>
-                                <p className="text-sm text-muted-foreground tabular-nums">
-                                    {fund.target > 0
-                                        ? `of ${formatPeso(fund.target)} target · ${fund.percent}% funded`
-                                        : 'not sized yet'}
-                                </p>
-                            </div>
-
-                            <div
-                                role="progressbar"
-                                aria-valuenow={fund.percent}
-                                aria-valuemin={0}
-                                aria-valuemax={100}
-                                aria-label="Emergency fund progress"
-                                className="mt-3 h-2 w-full overflow-hidden rounded-full bg-muted"
-                            >
-                                <div
-                                    className="h-full rounded-full bg-emerald-600 transition-[width] duration-500 motion-reduce:transition-none dark:bg-emerald-400"
-                                    style={{ width: `${fund.percent}%` }}
-                                />
-                            </div>
-
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between gap-4">
+                        <CardTitle className="flex items-center gap-2 text-base">
+                            <ShieldCheck
+                                aria-hidden
+                                className="size-4 text-muted-foreground"
+                            />
+                            Emergency fund
+                        </CardTitle>
+                        <Button variant="ghost" size="sm" asChild>
+                            <Link href={financeRoute()}>Adjust</Link>
+                        </Button>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
                             <p
-                                data-test="dashboard-fund-note"
-                                className="mt-2 text-xs text-muted-foreground"
+                                data-test="dashboard-fund"
+                                className="text-2xl font-semibold tracking-tight tabular-nums"
                             >
-                                {fundNote(fund)}
+                                {formatPeso(fund.balance)}
                             </p>
-                        </CardContent>
-                    </Card>
-                )}
+                            <p className="text-sm text-muted-foreground tabular-nums">
+                                {fund.target > 0
+                                    ? `of ${formatPeso(fund.target)} target · ${fund.percent}% funded`
+                                    : 'not sized yet'}
+                            </p>
+                        </div>
+
+                        <div
+                            role="progressbar"
+                            aria-valuenow={fund.percent}
+                            aria-valuemin={0}
+                            aria-valuemax={100}
+                            aria-label="Emergency fund progress"
+                            className="mt-3 h-2 w-full overflow-hidden rounded-full bg-muted"
+                        >
+                            <div
+                                className="h-full rounded-full bg-emerald-600 transition-[width] duration-500 motion-reduce:transition-none dark:bg-emerald-400"
+                                style={{ width: `${fund.percent}%` }}
+                            />
+                        </div>
+
+                        <p
+                            data-test="dashboard-fund-note"
+                            className="mt-2 text-xs text-muted-foreground"
+                        >
+                            {fundNote(fund)}
+                        </p>
+                    </CardContent>
+                </Card>
 
                 {/*
                  * Each tile owns its own <dl>. A single list wrapping the cards
@@ -462,14 +436,19 @@ export default function Dashboard() {
                                     formatAmount={formatPeso}
                                 />
                             ) : (
-                                <p
+                                <EmptyPanel
                                     data-test="savings-empty"
-                                    className="py-10 text-sm text-muted-foreground"
+                                    icon={ChartColumn}
+                                    title="No month has been settled yet"
+                                    action={{
+                                        label: 'Go to paydays',
+                                        href: payoutsRoute(),
+                                    }}
+                                    preview={<ChartGhost />}
                                 >
-                                    No month has been settled yet. Finalize a
-                                    payday on the payouts page and it lands
-                                    here.
-                                </p>
+                                    Finalize a payday and what it actually put
+                                    by lands here, one bar per month.
+                                </EmptyPanel>
                             )}
                         </CardContent>
                     </Card>
@@ -481,9 +460,7 @@ export default function Dashboard() {
                                     aria-hidden
                                     className="size-4 text-muted-foreground"
                                 />
-                                {hasPlan
-                                    ? 'Planned by group'
-                                    : 'Spending categories'}
+                                Planned by group
                             </CardTitle>
                             <Button variant="ghost" size="sm" asChild>
                                 <Link
@@ -548,9 +525,25 @@ export default function Dashboard() {
                         </Button>
                     </CardHeader>
                     <CardContent className="divide-y divide-border pt-0">
+                        {recentActivity.length === 0 && (
+                            <EmptyPanel
+                                data-test="activity-empty"
+                                icon={Activity}
+                                title="No activity yet"
+                                action={{
+                                    label: 'Go to paydays',
+                                    href: payoutsRoute(),
+                                }}
+                            >
+                                Every row here comes from a payday. Once one
+                                opens, what it brings in and sends out shows up
+                                here.
+                            </EmptyPanel>
+                        )}
                         {recentActivity.map((item) => (
                             <div
-                                key={item.title}
+                                key={item.key}
+                                data-test="activity-row"
                                 className="flex items-center justify-between gap-4 py-3"
                             >
                                 <div className="flex min-w-0 items-center gap-3">
@@ -583,7 +576,9 @@ export default function Dashboard() {
                                             {item.title}
                                         </p>
                                         <p className="text-xs text-muted-foreground">
-                                            {item.when}
+                                            {formatActivityDate(item.date)}
+                                            {item.status === 'pending' &&
+                                                ' · Pending'}
                                         </p>
                                     </div>
                                 </div>
