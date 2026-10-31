@@ -27,3 +27,8 @@ Before diagnosing anything a browser test tells you, check for `public/hot`. To 
 `@save-plan` is disabled while the plan is not dirty. Clicking it right after a `refresh()` does not fail — Playwright waits for it to become enabled, with no deadline of its own, and the run sits there until the suite timeout.
 
 Make an actual edit before clicking save. The same trap applies to any control the page disables.
+
+## The browser suite's server drops file uploads
+Pest serves the app through its own HTTP server (`LaravelHttpServer`), which builds the Laravel request with an empty files array — the source literally reads `// @TODO files...`. A multipart form submitted from a browser test reaches the controller without its file, so validation answers "The file field is required." however the file was attached. `attach()` fails earlier still when Playwright is not local ("localPaths are not allowed").
+
+Test an upload as a feature test with `UploadedFile::fake()->createWithContent()`, and keep the browser test to the dialog, the copy and accessibility. Plan import is covered this way in tests/Feature/BudgetPlanFileTest.php.

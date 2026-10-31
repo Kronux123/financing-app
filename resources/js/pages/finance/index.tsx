@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 import { GrossPayCard } from '@/components/finance/gross-pay-card';
 import { PaycheckCard } from '@/components/finance/paycheck-card';
+import { PlanFileActions } from '@/components/finance/plan-file-actions';
 import { PlanSummary } from '@/components/finance/plan-summary';
 import { SavingsCard } from '@/components/finance/savings-card';
 import { PageHeader } from '@/components/page-header';
@@ -10,7 +11,10 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
-import { useBudgetPlanDraft } from '@/hooks/use-budget-plan';
+import {
+    useBudgetPlanDraft,
+    useStoredBudgetPlan,
+} from '@/hooks/use-budget-plan';
 import { useDeductions } from '@/hooks/use-deductions';
 import type { EmergencyFund, ExpenseItem, PayCadence } from '@/lib/budget';
 import {
@@ -25,7 +29,14 @@ import { dashboard } from '@/routes';
 import { edit as financeRoute } from '@/routes/finance';
 
 export default function Finance() {
-    const { plan, isDirty, update: updatePlan, save } = useBudgetPlanDraft();
+    const {
+        plan,
+        isDirty,
+        update: updatePlan,
+        save,
+        discardChanges,
+    } = useBudgetPlanDraft();
+    const hasSavedPlan = useStoredBudgetPlan() !== null;
     const fromGross = isPaidFromGross(plan);
     const { deductions, isCurrent } = useDeductions(
         fromGross ? (plan.grossMonthly ?? 0) : null,
@@ -188,6 +199,10 @@ export default function Finance() {
                     description="Set how you get paid, then give every peso a job before it arrives."
                     actions={
                         <>
+                            <PlanFileActions
+                                hasSavedPlan={hasSavedPlan}
+                                onImported={discardChanges}
+                            />
                             {isDirty && (
                                 <span className="text-sm text-muted-foreground">
                                     Unsaved changes

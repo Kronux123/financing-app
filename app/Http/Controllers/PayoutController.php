@@ -18,9 +18,9 @@ class PayoutController extends Controller
     /**
      * Show every payday that has been, newest first.
      *
-     * Only records that exist: the daily `payouts:open` command is what creates
-     * them, so this reads the ledger rather than working out what should be in
-     * it. Nothing is derived here, and nothing is opened by looking.
+     * Only records that exist: this reads the ledger rather than working out
+     * what should be in it. Anything due has already been opened on the way in,
+     * by OpenDuePayouts, so a payday the scheduler missed still shows.
      */
     public function index(Request $request): Response
     {

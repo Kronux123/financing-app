@@ -8,6 +8,7 @@ use App\Models\BudgetPlan;
 use App\Models\Paycheck;
 use App\Models\Payout;
 use Carbon\CarbonInterface;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -86,6 +87,22 @@ class OpenPayoutsForPlan
             return false;
         }
 
+        try {
+            $this->create($plan, $paycheck, $paidOn);
+        } catch (UniqueConstraintViolationException) {
+            /*
+             * Paydays open on page loads as well as from the scheduler, so two
+             * of them can pass the check above together. The loser lands here,
+             * its transaction rolled back, and the payday is open either way.
+             */
+            return false;
+        }
+
+        return true;
+    }
+
+    private function create(BudgetPlan $plan, Paycheck $paycheck, CarbonInterface $paidOn): void
+    {
         DB::transaction(function () use ($plan, $paycheck, $paidOn): void {
             $payout = new Payout;
 
@@ -107,8 +124,6 @@ class OpenPayoutsForPlan
 
             $this->copyLines($plan, $paycheck, $payout);
         });
-
-        return true;
     }
 
     /**

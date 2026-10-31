@@ -100,6 +100,8 @@ export type PlanDraft = {
     isDirty: boolean;
     update: (next: BudgetPlan) => void;
     save: (onSuccess?: () => void) => void;
+    /** Drops live edits, so the next plan the server sends is adopted. */
+    discardChanges: () => void;
 };
 
 /**
@@ -137,5 +139,12 @@ export function useBudgetPlanDraft(): PlanDraft {
                 onSuccess?.();
             });
         },
+        /*
+         * Functional, because it runs from a visit's callback after the new prop
+         * has already rendered once: the draft it rewinds is the current one,
+         * and the adoption check above then takes the plan that just arrived.
+         */
+        discardChanges: () =>
+            setDraft((current) => ({ ...current, plan: current.saved })),
     };
 }
