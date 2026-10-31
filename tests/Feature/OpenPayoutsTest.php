@@ -41,6 +41,8 @@ test('a payday that has been gets a pending record', function () {
 // The unique key is the backstop, but the command should not lean on an
 // exception to stay idempotent.
 test('running twice opens nothing the second time', function () {
+    $this->travelTo('2026-06-10 09:00');
+
     planOpenSince();
 
     $this->artisan('payouts:open')->assertSuccessful();
@@ -65,6 +67,8 @@ test('a payday still to come is left alone', function () {
 
 // The app has nothing to say about months it was not around for.
 test('paydays from before the plan existed are not invented', function () {
+    $this->travelTo('2026-06-10 09:00');
+
     planOpenSince('-2 days');
 
     $this->artisan('payouts:open --months=6')->assertSuccessful();
@@ -135,6 +139,8 @@ test('semi-monthly pay opens two records a month', function () {
 });
 
 test('a deleted payday is not reopened behind your back', function () {
+    $this->travelTo('2026-06-10 09:00');
+
     planOpenSince();
 
     $this->artisan('payouts:open')->assertSuccessful();

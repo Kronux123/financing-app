@@ -19,7 +19,7 @@ function recordPaydays(User $user, int $count = 6): void
         $payout = Payout::factory()->for($user)->finalized()->create([
             'paycheck_label' => "Payday {$number}",
             // Newest first, so payday 1 opens the log.
-            'paid_on' => now()->subMonths($number - 1)->startOfMonth()->toDateString(),
+            'paid_on' => now()->subMonthsNoOverflow($number - 1)->startOfMonth()->toDateString(),
         ]);
 
         PayoutIncome::factory()->for($payout)->create([

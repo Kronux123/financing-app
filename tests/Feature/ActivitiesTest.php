@@ -13,12 +13,17 @@ beforeEach(function () {
     $this->actingAs($this->user);
 });
 
-/** A payday with `$lines` lines on it, so a log can be made long enough to page. */
+/**
+ * A payday with `$lines` lines on it, so a log can be made long enough to page.
+ *
+ * NoOverflow, because on the 31st a plain `subMonths(1)` asks for the 31st of a
+ * shorter month, rolls into the current one, and collides with this month's payday.
+ */
 function recordPayday(User $user, int $monthsBack, int $lines = 4): Payout
 {
     $payout = Payout::factory()->for($user)->finalized()->create([
         'paycheck_label' => "Payday {$monthsBack}",
-        'paid_on' => now()->subMonths($monthsBack)->startOfMonth()->toDateString(),
+        'paid_on' => now()->subMonthsNoOverflow($monthsBack)->startOfMonth()->toDateString(),
     ]);
 
     PayoutIncome::factory()->for($payout)->create([
