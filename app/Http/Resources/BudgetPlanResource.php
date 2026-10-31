@@ -36,6 +36,8 @@ class BudgetPlanResource extends JsonResource
     {
         return [
             'cadence' => $this->cadence->value,
+            /** Null when the paychecks carry take-home typed in by hand. */
+            'grossMonthly' => $this->monthly_gross === null ? null : $this->toPesos($this->monthly_gross),
             'paychecks' => $this->paychecks->map($this->paycheck(...))->values(),
             'groups' => collect(ExpenseGroup::cases())
                 ->map(fn (ExpenseGroup $group): array => [

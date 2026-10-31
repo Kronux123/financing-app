@@ -556,3 +556,81 @@ test('the budget plan has no accessibility issues in dark mode', function () {
         ->assertSeeIn('@paycheck-mid-month', 'Fully allocated')
         ->assertNoAccessibilityIssues();
 });
+
+test('a gross works out the take-home on the paycheck', function () {
+    $page = visit(route('finance.edit'));
+
+    $page->click('@pay-basis-gross')
+        ->type('@gross-monthly', '40000')
+        ->assertSeeIn('@deduction-sss', '₱1,750.00')
+        ->assertSeeIn('@deduction-philhealth', '₱1,000.00')
+        ->assertSeeIn('@deduction-pagibig', '₱200.00')
+        ->assertSeeIn('@deduction-tax', '₱2,618.40')
+        ->assertSeeIn('@gross-take-home', '₱34,431.60')
+        ->assertValue('@income-monthly', '34431.6')
+        ->assertDisabled('@income-monthly')
+        ->assertNoJavaScriptErrors();
+});
+
+// Tax comes off both paychecks, half each; the contributions only off the end
+// of the month.
+test('semi-monthly pay splits the tax and leaves contributions to the end of the month', function () {
+    $page = visit(route('finance.edit'));
+
+    $page->click('@cadence-semi-monthly')
+        ->click('@pay-basis-gross')
+        ->type('@gross-monthly', '40000')
+        ->assertSeeIn('@gross-take-home', '₱34,431.60')
+        ->assertValue('@income-mid-month', '18690.8')
+        ->assertValue('@income-end-month', '15740.8')
+        ->assertSee('Tax is split across both paychecks');
+});
+
+test('a gross plan comes back as a gross plan', function () {
+    $page = visit(route('finance.edit'));
+
+    $page->click('@pay-basis-gross')
+        ->type('@gross-monthly', '40000')
+        ->assertValue('@income-monthly', '34431.6')
+        ->click('@save-plan')
+        ->assertSee('Budget plan saved.');
+
+    $page->refresh()
+        ->assertPathIs('/finance')
+        ->assertValue('@gross-monthly', '40000')
+        ->assertSeeIn('@gross-take-home', '₱34,431.60')
+        ->assertDisabled('@income-monthly')
+        // Opening on a saved gross is not an edit.
+        ->assertSee('Save plan')
+        ->assertDontSee('Unsaved changes');
+});
+
+test('switching back to take-home hands the paycheck back to you', function () {
+    $page = visit(route('finance.edit'));
+
+    $page->click('@pay-basis-gross')
+        ->type('@gross-monthly', '40000')
+        ->assertValue('@income-monthly', '34431.6')
+        ->click('@pay-basis-take-home')
+        ->assertMissing('@gross-pay')
+        ->assertEnabled('@income-monthly')
+        ->assertValue('@income-monthly', '34431.6');
+});
+
+test('the gross breakdown has no accessibility issues', function () {
+    $page = visit(route('finance.edit'));
+
+    $page->click('@pay-basis-gross')
+        ->type('@gross-monthly', '40000')
+        ->assertSeeIn('@gross-take-home', '₱34,431.60')
+        ->assertNoAccessibilityIssues();
+});
+
+test('the gross breakdown has no accessibility issues in dark mode', function () {
+    $page = visit(route('finance.edit'))->inDarkMode();
+
+    $page->click('@pay-basis-gross')
+        ->type('@gross-monthly', '40000')
+        ->assertSeeIn('@gross-take-home', '₱34,431.60')
+        ->assertNoAccessibilityIssues();
+});

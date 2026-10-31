@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable([
     'cadence',
+    'monthly_gross',
     'months_of_cover',
     'emergency_fund_balance',
     'savings_pot_balance',
@@ -29,6 +30,7 @@ class BudgetPlan extends Model
     {
         return [
             'cadence' => PayCadence::class,
+            'monthly_gross' => 'integer',
             'months_of_cover' => 'integer',
             'emergency_fund_balance' => 'integer',
             'savings_pot_balance' => 'integer',
@@ -83,6 +85,12 @@ class BudgetPlan extends Model
     public function totalSaved(): int
     {
         return $this->emergency_fund_balance + $this->savings_pot_balance;
+    }
+
+    /** Whether the paychecks are worked out from a gross rather than typed in. */
+    public function isPaidFromGross(): bool
+    {
+        return $this->monthly_gross !== null;
     }
 
     public function monthlyIncome(): int

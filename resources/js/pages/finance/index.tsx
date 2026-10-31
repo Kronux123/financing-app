@@ -1,5 +1,7 @@
 import { Head, Link } from '@inertiajs/react';
+import { useState } from 'react';
 import { toast } from 'sonner';
+import { GrossPayCard } from '@/components/finance/gross-pay-card';
 import { PaycheckCard } from '@/components/finance/paycheck-card';
 import { PlanSummary } from '@/components/finance/plan-summary';
 import { SavingsCard } from '@/components/finance/savings-card';
@@ -7,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { useBudgetPlanDraft } from '@/hooks/use-budget-plan';
+import { useDeductions } from '@/hooks/use-deductions';
 import type { EmergencyFund, ExpenseItem, PayCadence } from '@/lib/budget';
 import {
     cadenceOptions,
@@ -14,11 +17,54 @@ import {
     reassignTo,
     withGroupAmount,
 } from '@/lib/budget';
+import type { Deductions } from '@/lib/deductions';
+import { isPaidFromGross, withPaycheckAmounts } from '@/lib/deductions';
 import { dashboard } from '@/routes';
 import { edit as financeRoute } from '@/routes/finance';
 
 export default function Finance() {
     const { plan, isDirty, update: updatePlan, save } = useBudgetPlanDraft();
+    const fromGross = isPaidFromGross(plan);
+    const { deductions, isCurrent } = useDeductions(
+        fromGross ? (plan.grossMonthly ?? 0) : null,
+        plan.cadence,
+    );
+    const [appliedDeductions, setAppliedDeductions] =
+        useState<Deductions | null>(null);
+
+    /*
+     * A fresh breakdown fills the paychecks with the take-home it gives. Done
+     * while rendering rather than in an effect, the way the draft adopts a saved
+     * plan, so the paychecks never paint one frame behind the gross.
+     */
+    if (
+        fromGross &&
+        deductions !== null &&
+        isCurrent &&
+        deductions !== appliedDeductions
+    ) {
+        setAppliedDeductions(deductions);
+
+        const next = withPaycheckAmounts(plan, deductions.paychecks);
+
+        if (next !== plan) {
+            updatePlan(next);
+        }
+    }
+
+    /**
+     * Gross starts empty rather than guessed from the take-home, and switching
+     * back keeps whatever take-home the gross last gave, ready to edit by hand.
+     */
+    const handlePayBasisChange = (value: string) => {
+        if (value === 'gross' && !fromGross) {
+            updatePlan({ ...plan, grossMonthly: 0 });
+        }
+
+        if (value === 'take-home' && fromGross) {
+            updatePlan({ ...plan, grossMonthly: null });
+        }
+    };
 
     const handleCadenceChange = (value: string) => {
         if (value !== 'monthly' && value !== 'semi-monthly') {
@@ -192,6 +238,50 @@ export default function Finance() {
                             </p>
                         </div>
 
+                        <div className="grid gap-2">
+                            <Label htmlFor="pay-basis">What you enter</Label>
+                            <ToggleGroup
+                                id="pay-basis"
+                                type="single"
+                                variant="outline"
+                                value={fromGross ? 'gross' : 'take-home'}
+                                onValueChange={handlePayBasisChange}
+                                className="w-full sm:w-auto"
+                            >
+                                <ToggleGroupItem
+                                    value="take-home"
+                                    data-test="pay-basis-take-home"
+                                    className="px-4"
+                                >
+                                    Take-home
+                                </ToggleGroupItem>
+                                <ToggleGroupItem
+                                    value="gross"
+                                    data-test="pay-basis-gross"
+                                    className="px-4"
+                                >
+                                    Gross
+                                </ToggleGroupItem>
+                            </ToggleGroup>
+                            <p className="text-xs text-muted-foreground">
+                                {fromGross
+                                    ? 'SSS, PhilHealth, Pag-IBIG and tax are worked out for you.'
+                                    : 'What actually lands in your account.'}
+                            </p>
+                        </div>
+
+                        {fromGross && (
+                            <GrossPayCard
+                                gross={plan.grossMonthly ?? 0}
+                                cadence={plan.cadence}
+                                deductions={deductions}
+                                isCurrent={isCurrent}
+                                onGrossChange={(grossMonthly) =>
+                                    updatePlan({ ...plan, grossMonthly })
+                                }
+                            />
+                        )}
+
                         <div
                             className={
                                 plan.cadence === 'semi-monthly'
@@ -207,6 +297,7 @@ export default function Finance() {
                                     otherPaycheck={plan.paychecks.find(
                                         (item) => item.id !== paycheck.id,
                                     )}
+                                    isFromGross={fromGross}
                                     onIncomeChange={(amount) =>
                                         handleIncomeChange(paycheck.id, amount)
                                     }

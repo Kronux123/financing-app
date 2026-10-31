@@ -27,6 +27,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard/activities', [ActivityController::class, 'index'])->name('dashboard.activities');
     Route::get('finance', [FinanceController::class, 'edit'])->name('finance.edit');
     Route::put('finance', [FinanceController::class, 'update'])->name('finance.update');
+    Route::get('finance/deductions', [FinanceController::class, 'deductions'])->name('finance.deductions');
     Route::inertia('debt', 'debt/index')->name('debt.index');
     Route::get('payouts', [PayoutController::class, 'index'])->name('payouts.index');
     Route::put('payouts/{payout}', [PayoutController::class, 'update'])->name('payouts.update');

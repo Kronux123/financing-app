@@ -184,6 +184,8 @@ type PaycheckCardProps = {
     paycheck: Paycheck;
     /** The paycheck an expense can be moved to; omitted when pay is monthly. */
     otherPaycheck?: Paycheck;
+    /** Take-home is worked out from the gross, so it reads rather than edits. */
+    isFromGross?: boolean;
     onIncomeChange: (amount: number) => void;
     onSavesRemainderChange: (savesRemainder: boolean) => void;
     onGroupAmountChange: (
@@ -204,6 +206,7 @@ export function PaycheckCard({
     plan,
     paycheck,
     otherPaycheck,
+    isFromGross = false,
     onIncomeChange,
     onSavesRemainderChange,
     onGroupAmountChange,
@@ -249,7 +252,13 @@ export function PaycheckCard({
                         data-test={`income-${paycheck.id}`}
                         value={paycheck.amount}
                         onValueChange={onIncomeChange}
+                        disabled={isFromGross}
                     />
+                    {isFromGross && (
+                        <p className="text-xs text-muted-foreground">
+                            Worked out from your gross pay.
+                        </p>
+                    )}
                 </div>
             </CardHeader>
 

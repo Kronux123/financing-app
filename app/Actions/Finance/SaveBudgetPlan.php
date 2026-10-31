@@ -20,6 +20,8 @@ use Illuminate\Support\Facades\DB;
  */
 class SaveBudgetPlan
 {
+    public function __construct(private readonly StatutoryDeductions $deductions) {}
+
     /**
      * @param  array<string, mixed>  $data
      */
@@ -36,6 +38,7 @@ class SaveBudgetPlan
 
             $plan->fill([
                 'cadence' => $data['cadence'],
+                'monthly_gross' => $data['monthly_gross'],
                 'months_of_cover' => $data['months_of_cover'],
                 'emergency_fund_balance' => $data['emergency_fund_balance'],
                 'savings_pot_balance' => $data['savings_pot_balance'],
@@ -65,15 +68,24 @@ class SaveBudgetPlan
     {
         $existing = $plan->paychecks()->get()->keyBy('key');
 
+        /*
+         * A plan paid from gross has its take-home worked out here, whatever the
+         * page sent. The page previews through the same calculation, so the two
+         * agree — but the server's copy is the one that is kept.
+         */
+        $fromGross = $plan->isPaidFromGross()
+            ? $this->deductions->paycheckAmounts($plan->cadence, $plan->monthly_gross)
+            : [];
+
         return collect($paychecks)
-            ->map(function (array $sent, int $position) use ($plan, $existing): Paycheck {
+            ->map(function (array $sent, int $position) use ($plan, $existing, $fromGross): Paycheck {
                 $paycheck = $existing->get($sent['key']) ?? new Paycheck;
 
                 $paycheck->fill([
                     'key' => $sent['key'],
                     'label' => $sent['label'],
                     'day_of_month' => $sent['day_of_month'],
-                    'amount' => $sent['amount'],
+                    'amount' => $fromGross[$sent['key']] ?? $sent['amount'],
                     'saves_remainder' => $sent['saves_remainder'],
                     'position' => $position,
                 ]);

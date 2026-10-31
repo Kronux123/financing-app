@@ -79,6 +79,7 @@ class BudgetPlanUpdateRequest extends FormRequest
 
         return [
             'cadence' => $data['cadence'],
+            'monthly_gross' => isset($data['grossMonthly']) ? $this->toCentavos($data['grossMonthly']) : null,
             'months_of_cover' => $data['emergencyFund']['monthsOfCover'],
             'emergency_fund_balance' => $this->toCentavos($data['emergencyFund']['balance']),
             'savings_pot_balance' => $this->toCentavos($data['savingsPot']['balance']),

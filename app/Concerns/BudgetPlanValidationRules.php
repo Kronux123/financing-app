@@ -23,6 +23,8 @@ trait BudgetPlanValidationRules
     {
         return [
             'cadence' => ['required', Rule::enum(PayCadence::class)],
+            /** Null for a plan that types its take-home in by hand. */
+            'grossMonthly' => ['nullable', ...$this->amountRules()],
             'emergencyFund.monthsOfCover' => ['required', 'integer', 'min:1', 'max:24'],
             'emergencyFund.balance' => ['required', ...$this->amountRules()],
             'savingsPot.balance' => ['required', ...$this->amountRules()],

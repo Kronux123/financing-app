@@ -51,6 +51,7 @@ export const saveBudgetPlan = (
 const serialise = (plan: BudgetPlan) => {
     return {
         cadence: plan.cadence,
+        grossMonthly: plan.grossMonthly ?? null,
         emergencyFund: plan.emergencyFund,
         savingsPot: plan.savingsPot,
         /**

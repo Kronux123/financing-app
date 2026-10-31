@@ -83,6 +83,12 @@ export type BudgetPlan = {
     /** Bumped when the shape changes, so stored plans can be migrated. */
     version: 6;
     cadence: PayCadence;
+    /**
+     * Monthly pay before deductions, when the plan is paid from gross. The
+     * paychecks then carry the take-home the server works out from it — see
+     * lib/deductions.ts. Null or absent means take-home is typed in by hand.
+     */
+    grossMonthly?: number | null;
     paychecks: Paycheck[];
     groups: ExpenseGroup[];
     emergencyFund: EmergencyFund;
@@ -190,6 +196,7 @@ export const createPlan = (): BudgetPlan => {
     return {
         version: PLAN_VERSION,
         cadence: 'monthly',
+        grossMonthly: null,
         paychecks: paychecksFor('monthly'),
         groups: defaultGroupNames.map((group) => ({ ...group, items: [] })),
         emergencyFund: createEmergencyFund(),
