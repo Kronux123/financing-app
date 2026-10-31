@@ -21,7 +21,7 @@ test('the dashboard renders every card once there is a plan', function () {
         ->assertSee('Outstanding debt')
         ->assertSee('Projected cashflow')
         ->assertSee('Monthly savings')
-        ->assertSee('Planned by group')
+        ->assertSee('pay goes')
         ->assertSee('Recent activity')
         ->assertNoJavaScriptErrors();
 });
@@ -141,7 +141,7 @@ test('the dashboard with a plan has no accessibility issues', function () {
 
     $page = visit(route('dashboard'));
 
-    $page->assertSee('Planned by group')
+    $page->assertSee('pay goes')
         ->assertNoAccessibilityIssues();
 });
 
@@ -150,6 +150,31 @@ test('the dashboard with a plan has no accessibility issues in dark mode', funct
 
     $page = visit(route('dashboard'))->inDarkMode();
 
-    $page->assertSee('Planned by group')
+    $page->assertSee('pay goes')
         ->assertNoAccessibilityIssues();
+});
+
+// The hero's gap is the point of it: a plan that spends more than it takes in
+// says so, and by how much.
+test('the pay split shows what is left to assign, and when it runs over', function () {
+    $page = visit(route('finance.edit'));
+
+    $page->type('@income-monthly', '20000')
+        ->click('@add-payables-monthly')
+        ->type('@item-amount-payables-monthly-0', '5000')
+        ->click('@save-plan')
+        ->assertSee('Budget plan saved.')
+        ->click('Back to dashboard')
+        ->assertSeeIn('@pay-flow-income', '₱20,000')
+        ->assertSeeIn('@pay-flow-unassigned', '₱15,000')
+        ->assertSee('Not yet given a job');
+
+    $page = visit(route('finance.edit'));
+
+    $page->type('@item-amount-payables-monthly-0', '25000')
+        ->click('@save-plan')
+        ->assertSee('Budget plan saved.')
+        ->click('Back to dashboard')
+        ->assertSeeIn('@pay-flow-unassigned', '−₱5,000')
+        ->assertSee('Over budget');
 });

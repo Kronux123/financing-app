@@ -514,7 +514,7 @@ test('the dashboard reflects a saved plan', function () {
         ->assertPathIs('/dashboard')
         ->assertSee('Savings overview')
         ->assertMissing('@dashboard-empty')
-        ->assertSee('Planned by group')
+        ->assertSeeIn('@pay-flow-income', '₱60,000')
         ->assertSee('₱15,000')
         ->assertSee('₱10,000')
         // A plan alone opens no payday, so there is nothing in the log yet.

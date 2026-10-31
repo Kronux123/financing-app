@@ -1,5 +1,5 @@
 import { Head, Link } from '@inertiajs/react';
-import { Check, ChevronDown, Plus, Wallet, X } from 'lucide-react';
+import { Check, ChevronDown, Plus, X } from 'lucide-react';
 import { useState } from 'react';
 import { EmptyPanel } from '@/components/dashboard/empty-panel';
 import { AmountInput } from '@/components/finance/amount-input';
@@ -567,7 +567,7 @@ export default function Payouts() {
                         <CardContent>
                             <EmptyPanel
                                 data-test="payouts-empty"
-                                icon={Wallet}
+                                art="wallet"
                                 title={
                                     plan === null
                                         ? 'No budget plan saved yet'

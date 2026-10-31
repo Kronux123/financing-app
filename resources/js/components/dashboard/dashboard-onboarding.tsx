@@ -1,5 +1,6 @@
 import { Link } from '@inertiajs/react';
-import { ArrowRight, PiggyBank } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
+import { PixelArt } from '@/components/pixel-art';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { edit as financeRoute } from '@/routes/finance';
@@ -96,9 +97,7 @@ export function DashboardOnboarding() {
 
             <CardContent className="relative grid gap-10 p-6 md:p-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,24rem)] lg:items-center">
                 <div className="flex flex-col items-start">
-                    <span className="flex size-11 items-center justify-center rounded-xl bg-jade/10 text-jade-ink">
-                        <PiggyBank aria-hidden className="size-5" />
-                    </span>
+                    <PixelArt sprite="piggy" size={72} />
 
                     <h2 className="mt-5 text-xl font-semibold tracking-tight text-balance">
                         Your overview fills in as you go

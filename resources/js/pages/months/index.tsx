@@ -1,10 +1,5 @@
 import { Head, Link } from '@inertiajs/react';
-import {
-    CalendarDays,
-    ChevronLeft,
-    ChevronRight,
-    FileSpreadsheet,
-} from 'lucide-react';
+import { ChevronLeft, ChevronRight, FileSpreadsheet } from 'lucide-react';
 import { useState } from 'react';
 import { EmptyPanel } from '@/components/dashboard/empty-panel';
 import { SavingsCalendar } from '@/components/dashboard/savings-calendar';
@@ -112,7 +107,7 @@ export default function DashboardMonths() {
                         <CardContent>
                             <EmptyPanel
                                 data-test="calendar-empty"
-                                icon={CalendarDays}
+                                art="calendar"
                                 title="No month has been settled yet"
                                 action={{
                                     label: 'Go to paydays',
