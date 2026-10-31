@@ -167,7 +167,7 @@ function MonthHeading({
     dot?: string;
 }) {
     return (
-        <p className="flex min-w-0 items-center gap-1.5 text-xs font-semibold tracking-wider uppercase">
+        <p className="flex min-w-0 items-center gap-1.5 text-sm font-semibold">
             {dot && (
                 <span
                     aria-hidden

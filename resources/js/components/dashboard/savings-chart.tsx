@@ -88,7 +88,7 @@ export function SavingsChart({ data, goal, formatAmount }: SavingsChartProps) {
                                     style={{
                                         height: `${Math.max(height, 2)}%`,
                                     }}
-                                    className="mx-auto w-full max-w-10 rounded-t-[4px] bg-emerald-600/80 transition-colors duration-150 outline-none group-hover:bg-emerald-600 focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none dark:bg-emerald-400/70 dark:group-hover:bg-emerald-400"
+                                    className="mx-auto w-full max-w-10 rounded-t-[4px] bg-jade/75 transition-colors duration-150 outline-none group-hover:bg-jade focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none"
                                 />
                             </div>
                         );

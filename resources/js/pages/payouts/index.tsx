@@ -1,6 +1,7 @@
 import { Head, Link } from '@inertiajs/react';
-import { Check, ChevronDown, Plus, X } from 'lucide-react';
+import { Check, ChevronDown, Plus, Wallet, X } from 'lucide-react';
 import { useState } from 'react';
+import { EmptyPanel } from '@/components/dashboard/empty-panel';
 import { AmountInput } from '@/components/finance/amount-input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -103,7 +104,7 @@ function StatusDot({ payout }: { payout: Payout }) {
     return (
         <span
             data-test={`payout-status-${payout.key}`}
-            className="flex items-center gap-1.5 text-xs whitespace-nowrap text-muted-foreground"
+            className="flex items-center gap-1.5 text-sm whitespace-nowrap text-muted-foreground"
         >
             <span
                 aria-hidden
@@ -128,10 +129,10 @@ function PayoutRow({ payout, onOpen }: { payout: Payout; onOpen: () => void }) {
             <span className="w-24 shrink-0 text-sm font-medium tabular-nums">
                 {paydayLabel(payout.paidOn)}
             </span>
-            <span className="w-24 shrink-0 truncate text-xs text-muted-foreground">
+            <span className="w-24 shrink-0 truncate text-sm text-muted-foreground">
                 {payout.paycheckLabel}
             </span>
-            <span className="flex-1 truncate text-xs text-muted-foreground">
+            <span className="flex-1 truncate text-sm text-muted-foreground">
                 {summary(payout)}
             </span>
             <span className="shrink-0 text-sm font-medium tabular-nums">
@@ -332,7 +333,7 @@ function PayoutDetail({ payout: stored }: { payout: Payout }) {
                         >
                             <Label
                                 htmlFor={`income-${payout.key}-${index}`}
-                                className="text-xs font-medium tracking-wide text-muted-foreground uppercase"
+                                className="text-sm font-medium text-muted-foreground"
                             >
                                 {income.source === 'paycheck'
                                     ? 'Take-home'
@@ -375,11 +376,11 @@ function PayoutDetail({ payout: stored }: { payout: Payout }) {
                                         {line.name}
                                     </span>
                                     {line.isUnplanned ? (
-                                        <span className="mt-0.5 inline-flex rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-semibold text-amber-800 dark:text-amber-300">
+                                        <span className="mt-0.5 inline-flex rounded-full bg-amber/10 px-2 py-0.5 text-xs font-semibold text-amber-800 dark:text-amber">
                                             Unplanned
                                         </span>
                                     ) : (
-                                        <span className="block text-xs text-muted-foreground tabular-nums">
+                                        <span className="block text-sm text-muted-foreground tabular-nums">
                                             {formatPeso(line.planned)} planned
                                         </span>
                                     )}
@@ -463,7 +464,7 @@ function PayoutDetail({ payout: stored }: { payout: Payout }) {
                     </p>
                     <p
                         data-test={`payout-variance-${payout.key}`}
-                        className="text-xs text-foreground/70 tabular-nums"
+                        className="text-sm text-foreground/70 tabular-nums"
                     >
                         {over ? 'over' : 'left'} · {summary(payout)}
                     </p>
@@ -563,15 +564,28 @@ export default function Payouts() {
 
                 {payouts.length === 0 ? (
                     <Card>
-                        <CardContent className="p-6">
-                            <p
+                        <CardContent>
+                            <EmptyPanel
                                 data-test="payouts-empty"
-                                className="text-sm text-muted-foreground"
+                                icon={Wallet}
+                                title={
+                                    plan === null
+                                        ? 'No budget plan saved yet'
+                                        : 'No payday has come round yet'
+                                }
+                                action={
+                                    plan === null
+                                        ? {
+                                              label: 'Build your plan',
+                                              href: financeRoute(),
+                                          }
+                                        : undefined
+                                }
                             >
                                 {plan === null
-                                    ? 'No budget plan saved yet. Build one and each payday will show up here to review.'
-                                    : 'No payday has come round yet on this plan.'}
-                            </p>
+                                    ? 'Build one and each payday shows up here to review.'
+                                    : 'Each payday on your plan opens here once its date arrives.'}
+                            </EmptyPanel>
                         </CardContent>
                     </Card>
                 ) : (
@@ -590,11 +604,11 @@ export default function Payouts() {
                     </div>
                 )}
 
-                <div className="flex flex-wrap gap-3">
-                    <Button variant="secondary" asChild size="sm">
+                <div className="flex flex-wrap gap-2">
+                    <Button variant="ghost" asChild size="sm">
                         <Link href={financeRoute()}>Edit the plan</Link>
                     </Button>
-                    <Button variant="secondary" asChild size="sm">
+                    <Button variant="ghost" asChild size="sm">
                         <Link href={dashboard()}>Back to dashboard</Link>
                     </Button>
                 </div>

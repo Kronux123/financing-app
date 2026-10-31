@@ -1,13 +1,11 @@
 import { cn } from '@/lib/utils';
 
 /**
- * The lit background, shared by every page.
+ * The lit background, for the pages outside the app.
  *
- * Three strengths, because the pages carry very different amounts of content.
- * The landing page is mostly air and can take the full treatment; auth pages
- * are a single card on an empty screen; the app itself is dense tables and
- * figures, where anything busy behind them costs legibility. So `app` gets the
- * glow at a fraction of its strength and no ruling at all.
+ * Two strengths: the landing page is mostly air and can take the full
+ * treatment, and auth pages are a single card on an empty screen. The app
+ * itself has none — see AppSidebarLayout.
  *
  * `z-0`, never a negative z-index: negative-index descendants of the root paint
  * *before* in-flow block backgrounds, and `body` carries an opaque
@@ -16,27 +14,17 @@ import { cn } from '@/lib/utils';
  * opaque background on anything in between.
  */
 type PageBackdropProps = {
-    variant?: 'landing' | 'auth' | 'app';
+    variant?: 'landing' | 'auth';
 };
 
 const glowStrength = {
     landing: 'opacity-100',
     auth: 'opacity-75',
-    /*
-     * 55, not the 30 this started at. While the sidebar was `variant="inset"`
-     * the whole wrapper carried an opaque `bg-sidebar` and no value here made
-     * any difference — the glow was being painted and then covered. Once the
-     * sidebar went `floating` that sheet lifted, and 30 turned out to be barely
-     * there rather than tastefully subtle.
-     */
-    app: 'opacity-55',
 } as const;
 
 const gridStrength = {
     landing: 'opacity-35',
     auth: 'opacity-20',
-    /** No ruling behind real data — it reads as part of the tables. */
-    app: null,
 } as const;
 
 export function PageBackdrop({ variant = 'landing' }: PageBackdropProps) {

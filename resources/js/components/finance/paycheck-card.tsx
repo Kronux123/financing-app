@@ -1,5 +1,6 @@
 import { ArrowLeftRight, Plus, X } from 'lucide-react';
 import { AmountInput } from '@/components/finance/amount-input';
+import { StatusMeter } from '@/components/finance/status-meter';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -20,14 +21,11 @@ import {
     unallocatedFor,
 } from '@/lib/budget';
 import { formatPeso } from '@/lib/currency';
-import { cn } from '@/lib/utils';
 
 type AllocationTier = {
     label: string;
     /** Solid fill for the bar and dot. */
     mark: string;
-    /** 10% tint for the surface behind the figures. */
-    surface: string;
 };
 
 /**
@@ -40,22 +38,18 @@ const tiers: Record<'over' | 'tight' | 'clear' | 'swept', AllocationTier> = {
     over: {
         label: 'Over-allocated',
         mark: 'bg-goal-behind',
-        surface: 'bg-goal-behind/10',
     },
     tight: {
         label: 'Tight',
         mark: 'bg-goal-close',
-        surface: 'bg-goal-close/10',
     },
     clear: {
         label: 'Comfortable',
         mark: 'bg-goal-met',
-        surface: 'bg-goal-met/10',
     },
     swept: {
         label: 'Fully allocated',
         mark: 'bg-goal-met',
-        surface: 'bg-goal-met/10',
     },
 };
 
@@ -140,7 +134,7 @@ function RemainderRow({
     item: ExpenseItem;
 }) {
     return (
-        <div className="flex items-center justify-between gap-2 rounded-md bg-goal-met/10 px-2.5 py-2">
+        <div className="flex items-center justify-between gap-2 rounded-md bg-muted px-3 py-2">
             <p className="text-sm">{item.name}</p>
             <p
                 data-test={`remainder-${paycheckId}`}
@@ -171,7 +165,7 @@ function SweepToggle({
             />
             <Label
                 htmlFor={`sweep-${paycheckId}`}
-                className="text-xs font-normal text-muted-foreground"
+                className="text-sm font-normal text-muted-foreground"
             >
                 Save whatever is left over
             </Label>
@@ -227,89 +221,69 @@ export function PaycheckCard({
     const percent = Math.round(share * 100);
 
     return (
-        <Card data-test={`paycheck-${paycheck.id}`} className="gap-4">
-            <CardHeader className="gap-3">
-                <div className="flex items-baseline justify-between gap-3">
-                    <div>
-                        <p className="font-semibold">{paycheck.label}</p>
-                        <p className="text-xs text-muted-foreground">
+        <Card data-test={`paycheck-${paycheck.id}`} className="gap-5">
+            <CardHeader className="gap-4">
+                <div className="flex items-end justify-between gap-4">
+                    <div className="min-w-0">
+                        <h2 className="text-base font-semibold">
+                            {paycheck.label}
+                        </h2>
+                        <p className="text-sm text-muted-foreground">
                             {paydayDescription(paycheck)}
                         </p>
                     </div>
-                    <span
-                        aria-hidden
-                        className={cn(
-                            'size-2.5 shrink-0 rounded-full',
-                            tier.mark,
-                        )}
-                    />
-                </div>
-
-                <div className="grid gap-1.5">
-                    <Label htmlFor={`income-${paycheck.id}`}>Take-home</Label>
-                    <AmountInput
-                        id={`income-${paycheck.id}`}
-                        data-test={`income-${paycheck.id}`}
-                        value={paycheck.amount}
-                        onValueChange={onIncomeChange}
-                        disabled={isFromGross}
-                    />
-                    {isFromGross && (
-                        <p className="text-xs text-muted-foreground">
-                            Worked out from your gross pay.
-                        </p>
-                    )}
-                </div>
-            </CardHeader>
-
-            <CardContent className="space-y-4">
-                <div className={cn('rounded-lg p-3', tier.surface)}>
-                    <div className="flex items-baseline justify-between gap-2">
-                        <p className="text-xs font-medium tracking-wide uppercase">
-                            {tier.label}
-                        </p>
-                        <p className="text-xs text-foreground/70 tabular-nums">
-                            {percent}% allocated
-                        </p>
-                    </div>
-
-                    <p
-                        data-test={`leftover-${paycheck.id}`}
-                        className="mt-1.5 text-2xl font-semibold tracking-tight tabular-nums"
-                    >
-                        {leftover < 0 ? '−' : ''}
-                        {formatPeso(leftover)}
-                    </p>
-                    <p className="text-xs text-foreground/70 tabular-nums">
-                        {leftover < 0 ? 'over' : 'left'} of{' '}
-                        {formatPeso(paycheck.amount)} ·{' '}
-                        <span data-test={`allocated-${paycheck.id}`}>
-                            {formatPeso(allocated)}
-                        </span>{' '}
-                        planned
-                    </p>
-
-                    <div
-                        role="progressbar"
-                        aria-valuenow={Math.min(percent, 100)}
-                        aria-valuemin={0}
-                        aria-valuemax={100}
-                        aria-label={`${paycheck.label}: ${formatPeso(allocated)} of ${formatPeso(paycheck.amount)} allocated, ${percent} percent — ${tier.label}`}
-                        className="mt-3 h-1.5 overflow-hidden rounded-full bg-foreground/10"
-                    >
-                        <div
-                            className={cn(
-                                'h-full rounded-full transition-[width] duration-300 motion-reduce:transition-none',
-                                tier.mark,
-                            )}
-                            style={{
-                                width: `${Math.min(share, 1) * 100}%`,
-                            }}
+                    <div className="grid w-40 shrink-0 gap-1.5">
+                        <Label
+                            htmlFor={`income-${paycheck.id}`}
+                            className="justify-end text-muted-foreground"
+                        >
+                            Take-home
+                        </Label>
+                        <AmountInput
+                            id={`income-${paycheck.id}`}
+                            data-test={`income-${paycheck.id}`}
+                            value={paycheck.amount}
+                            onValueChange={onIncomeChange}
+                            disabled={isFromGross}
                         />
                     </div>
                 </div>
+                {isFromGross && (
+                    <p className="-mt-2 text-right text-sm text-muted-foreground">
+                        Worked out from your gross pay
+                    </p>
+                )}
 
-                <div className="space-y-4">
+                <StatusMeter
+                    status={tier.label}
+                    tone={tier.mark}
+                    aside={`${percent}% allocated`}
+                    figure={
+                        <p
+                            data-test={`leftover-${paycheck.id}`}
+                            className="text-2xl font-semibold tracking-tight tabular-nums"
+                        >
+                            {leftover < 0 ? '−' : ''}
+                            {formatPeso(leftover)}
+                        </p>
+                    }
+                    note={
+                        <>
+                            {leftover < 0 ? 'over' : 'left'} of{' '}
+                            {formatPeso(paycheck.amount)}, with{' '}
+                            <span data-test={`allocated-${paycheck.id}`}>
+                                {formatPeso(allocated)}
+                            </span>{' '}
+                            planned
+                        </>
+                    }
+                    percent={Math.min(share, 1) * 100}
+                    label={`${paycheck.label}: ${formatPeso(allocated)} of ${formatPeso(paycheck.amount)} allocated, ${percent} percent — ${tier.label}`}
+                />
+            </CardHeader>
+
+            <CardContent className="border-t border-border pt-5">
+                <div className="space-y-6">
                     {plan.groups.map((group) => {
                         const funded = itemsFor(group, paycheck.id);
                         const items = funded.filter(
@@ -323,7 +297,7 @@ export function PaycheckCard({
                                     <div className="flex items-center justify-between gap-2">
                                         <Label
                                             htmlFor={`amount-${group.id}-${paycheck.id}`}
-                                            className="text-xs font-medium tracking-wide text-muted-foreground uppercase"
+                                            className="text-sm font-medium"
                                         >
                                             {group.name}
                                         </Label>
@@ -365,11 +339,11 @@ export function PaycheckCard({
 
                         return (
                             <div key={group.id} className="space-y-3">
-                                <div className="flex items-baseline justify-between gap-2 border-b border-border pb-1.5">
-                                    <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                                <div className="flex items-baseline justify-between gap-2">
+                                    <h3 className="text-sm font-semibold">
                                         {group.name}
-                                    </p>
-                                    <p className="text-xs font-medium tabular-nums">
+                                    </h3>
+                                    <p className="text-sm font-semibold tabular-nums">
                                         {formatPeso(
                                             groupTotal(group, paycheck.id),
                                         )}
@@ -456,7 +430,7 @@ export function PaycheckCard({
                                                 <div className="flex items-center gap-1.5">
                                                     <span
                                                         aria-hidden
-                                                        className="text-xs text-muted-foreground"
+                                                        className="text-sm text-muted-foreground"
                                                     >
                                                         Started
                                                     </span>
@@ -480,14 +454,14 @@ export function PaycheckCard({
                                                                 },
                                                             )
                                                         }
-                                                        className="h-8 w-36 text-xs [color-scheme:light] dark:[color-scheme:dark]"
+                                                        className="h-8 w-40 text-sm [color-scheme:light] dark:[color-scheme:dark]"
                                                     />
                                                     <Button
                                                         type="button"
                                                         variant="ghost"
                                                         size="sm"
                                                         data-test={`item-started-today-${group.id}-${paycheck.id}-${index}`}
-                                                        className="h-7 px-2 text-xs text-foreground/70"
+                                                        className="h-7 px-2 text-sm text-foreground/70"
                                                         onClick={() =>
                                                             onItemChange(
                                                                 group.id,
@@ -518,7 +492,7 @@ export function PaycheckCard({
                                                  */}
                                                 <span
                                                     aria-hidden
-                                                    className="text-xs text-muted-foreground"
+                                                    className="text-sm text-muted-foreground"
                                                 >
                                                     Ends
                                                     {item.isDebt && (
@@ -552,7 +526,7 @@ export function PaycheckCard({
                                                             },
                                                         )
                                                     }
-                                                    className="h-8 w-36 text-xs [color-scheme:light] dark:[color-scheme:dark]"
+                                                    className="h-8 w-40 text-sm [color-scheme:light] dark:[color-scheme:dark]"
                                                 />
                                             </div>
 
@@ -579,7 +553,7 @@ export function PaycheckCard({
                                                 />
                                                 <Label
                                                     htmlFor={`is-debt-${group.id}-${paycheck.id}-${index}`}
-                                                    className="text-xs font-normal text-muted-foreground"
+                                                    className="text-sm font-normal text-muted-foreground"
                                                 >
                                                     Debt
                                                 </Label>
@@ -615,7 +589,7 @@ export function PaycheckCard({
                                         {item.isDebt && (
                                             <p
                                                 data-test={`item-owed-${group.id}-${paycheck.id}-${index}`}
-                                                className="text-xs text-muted-foreground tabular-nums"
+                                                className="text-sm text-muted-foreground tabular-nums"
                                             >
                                                 {debtNote(item, today)}
                                             </p>
@@ -639,7 +613,7 @@ export function PaycheckCard({
                                     Add to {group.name}
                                 </Button>
 
-                                <p className="text-xs text-muted-foreground">
+                                <p className="text-sm text-muted-foreground">
                                     Give a payable that stops, like an
                                     installment, its end date. Tick Debt and it
                                     counts toward what you owe.

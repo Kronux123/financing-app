@@ -1,6 +1,12 @@
 import { Head, Link } from '@inertiajs/react';
-import { ChevronLeft, ChevronRight, FileSpreadsheet } from 'lucide-react';
+import {
+    CalendarDays,
+    ChevronLeft,
+    ChevronRight,
+    FileSpreadsheet,
+} from 'lucide-react';
 import { useState } from 'react';
+import { EmptyPanel } from '@/components/dashboard/empty-panel';
 import { SavingsCalendar } from '@/components/dashboard/savings-calendar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
@@ -103,21 +109,19 @@ export default function DashboardMonths() {
 
                 {history.length === 0 ? (
                     <Card>
-                        <CardContent className="p-6">
-                            <p
+                        <CardContent>
+                            <EmptyPanel
                                 data-test="calendar-empty"
-                                className="text-sm text-muted-foreground"
+                                icon={CalendarDays}
+                                title="No month has been settled yet"
+                                action={{
+                                    label: 'Go to paydays',
+                                    href: payoutsRoute(),
+                                }}
                             >
-                                No month has been settled yet. Finalize a payday
-                                on the{' '}
-                                <Link
-                                    href={payoutsRoute()}
-                                    className="underline underline-offset-4"
-                                >
-                                    payouts page
-                                </Link>{' '}
-                                and the month it belongs to fills in here.
-                            </p>
+                                Finalize a payday and the month it belongs to
+                                fills in here.
+                            </EmptyPanel>
                         </CardContent>
                     </Card>
                 ) : (
@@ -212,25 +216,27 @@ export default function DashboardMonths() {
                  * wrapping the cards put two divs between the list and its
                  * terms, which is not a shape a description list may take.
                  */}
-                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                    {summary.map((item) => (
-                        <Card key={item.label}>
-                            <CardContent className="p-5">
-                                <dl>
-                                    <dt className="text-sm text-muted-foreground">
-                                        {item.label}
-                                    </dt>
-                                    <dd className="mt-1 text-2xl font-semibold tabular-nums">
-                                        {item.value}
-                                    </dd>
-                                </dl>
-                                <p className="mt-1 text-xs text-muted-foreground">
-                                    {item.note}
-                                </p>
-                            </CardContent>
-                        </Card>
-                    ))}
-                </div>
+                {history.length > 0 && (
+                    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                        {summary.map((item) => (
+                            <Card key={item.label}>
+                                <CardContent className="p-5">
+                                    <dl>
+                                        <dt className="text-sm text-muted-foreground">
+                                            {item.label}
+                                        </dt>
+                                        <dd className="mt-1 text-2xl font-semibold tabular-nums">
+                                            {item.value}
+                                        </dd>
+                                    </dl>
+                                    <p className="mt-1 text-sm text-muted-foreground">
+                                        {item.note}
+                                    </p>
+                                </CardContent>
+                            </Card>
+                        ))}
+                    </div>
+                )}
             </div>
         </>
     );

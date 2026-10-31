@@ -1,6 +1,6 @@
 import { Head, Link, router } from '@inertiajs/react';
 import { ActivityPagination } from '@/components/activities/activity-pagination';
-import { Badge } from '@/components/ui/badge';
+import { PageHeader } from '@/components/page-header';
 import { Button } from '@/components/ui/button';
 import {
     Card,
@@ -52,8 +52,8 @@ const columns = [
  */
 const statusVariant = (status: Activity['status']) =>
     status === 'finalized'
-        ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
-        : 'bg-amber-500/10 text-amber-800 dark:text-amber-300';
+        ? 'bg-jade/10 text-jade-ink'
+        : 'bg-amber/10 text-amber-800 dark:text-amber';
 
 type ActivitiesPageProps = {
     activities: Activity[];
@@ -89,39 +89,25 @@ export default function ActivitiesPage({
             <Head title="Activities" />
 
             <div className="flex w-full flex-1 flex-col gap-6 overflow-x-auto p-4 md:p-6">
-                <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-                    <div>
-                        <p className="text-sm font-medium tracking-[0.2em] text-muted-foreground uppercase">
-                            Activity log
-                        </p>
-                        <h1 className="mt-2 text-3xl font-semibold text-foreground">
-                            Activities
-                        </h1>
-                        <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-                            Every payday you have recorded, read end to end —
-                            what came in, what went out, and what is still open
-                            to correction.
-                        </p>
-                    </div>
-
-                    <Button asChild variant="secondary" size="sm">
-                        <Link href={dashboard()}>Back to dashboard</Link>
-                    </Button>
-                </div>
+                <PageHeader
+                    title="Activities"
+                    description="Every payday you have recorded: what came in, what went out, and what is still open to correction."
+                    actions={
+                        <Button asChild variant="ghost" size="sm">
+                            <Link href={dashboard()}>Back to dashboard</Link>
+                        </Button>
+                    }
+                />
 
                 <Card className="overflow-hidden">
                     <CardHeader>
-                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                            <div>
-                                <CardTitle>All activities</CardTitle>
-                                <CardDescription>
-                                    Page through every transaction in your
-                                    account. How many rows you show is
-                                    remembered for next time.
-                                </CardDescription>
-                            </div>
-                            <Badge variant="secondary">Latest</Badge>
-                        </div>
+                        <CardTitle className="text-base">
+                            All activities
+                        </CardTitle>
+                        <CardDescription>
+                            Newest first. How many rows you show is remembered
+                            for next time.
+                        </CardDescription>
                     </CardHeader>
 
                     {/*
@@ -178,7 +164,7 @@ export default function ActivitiesPage({
                                                 <TableCell className="px-6 py-4 font-medium text-foreground">
                                                     {activity.title}
                                                     {activity.isUnplanned && (
-                                                        <span className="ml-2 inline-flex rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-semibold text-amber-800 dark:text-amber-300">
+                                                        <span className="ml-2 inline-flex rounded-full bg-amber/10 px-2 py-0.5 text-xs font-semibold text-amber-800 dark:text-amber">
                                                             Unplanned
                                                         </span>
                                                     )}
@@ -192,8 +178,8 @@ export default function ActivitiesPage({
                                                 <TableCell
                                                     className={`px-3 py-4 text-right font-semibold ${
                                                         activity.amount > 0
-                                                            ? 'text-emerald-700 dark:text-emerald-400'
-                                                            : 'text-rose-600 dark:text-rose-400'
+                                                            ? 'text-jade'
+                                                            : 'text-destructive'
                                                     } whitespace-nowrap tabular-nums`}
                                                 >
                                                     {formatSigned(

@@ -40,7 +40,7 @@ function OverviewPreview() {
             <div className="flex items-end justify-between gap-4">
                 <div className="space-y-2">
                     <div className="h-2 w-16 rounded-full bg-muted" />
-                    <div className="h-5 w-28 rounded-md bg-emerald-500/25" />
+                    <div className="h-5 w-28 rounded-md bg-jade/25" />
                 </div>
                 <div className="flex gap-3">
                     <div className="h-4 w-10 rounded-md bg-muted" />
@@ -70,8 +70,8 @@ function OverviewPreview() {
                         key={index}
                         className={`flex-1 rounded-t-sm ${
                             index === previewBars.length - 1
-                                ? 'bg-emerald-500/60'
-                                : 'bg-emerald-500/20'
+                                ? 'bg-jade/60'
+                                : 'bg-jade/20'
                         }`}
                         style={{ height: `${height}%` }}
                     />
@@ -91,12 +91,12 @@ export function DashboardOnboarding() {
         <Card data-test="dashboard-empty" className="relative overflow-hidden">
             <div
                 aria-hidden
-                className="pointer-events-none absolute -top-32 -right-32 size-96 rounded-full bg-emerald-500/10 blur-3xl"
+                className="pointer-events-none absolute -top-32 -right-32 size-96 rounded-full bg-jade/10 blur-3xl"
             />
 
             <CardContent className="relative grid gap-10 p-6 md:p-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,24rem)] lg:items-center">
                 <div className="flex flex-col items-start">
-                    <span className="flex size-11 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-700 dark:text-emerald-300">
+                    <span className="flex size-11 items-center justify-center rounded-xl bg-jade/10 text-jade-ink">
                         <PiggyBank aria-hidden className="size-5" />
                     </span>
 
@@ -115,7 +115,7 @@ export function DashboardOnboarding() {
                                 <span
                                     className={`flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold tabular-nums ${
                                         index === 0
-                                            ? 'bg-emerald-700 text-white dark:bg-emerald-400 dark:text-emerald-950'
+                                            ? 'bg-primary text-primary-foreground'
                                             : 'border border-border text-muted-foreground'
                                     }`}
                                 >

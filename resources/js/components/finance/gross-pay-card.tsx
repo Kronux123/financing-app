@@ -1,5 +1,4 @@
 import { AmountInput } from '@/components/finance/amount-input';
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import type { PayCadence } from '@/lib/budget';
 import { formatPesoExact } from '@/lib/currency';
@@ -18,9 +17,14 @@ type GrossPayCardProps = {
 /**
  * Pay before deductions, and what comes off it on the way to take-home.
  *
- * The figures are the server's — this card only lays them out. While a fresh
- * breakdown is on its way the last one stays up, dimmed, so the numbers never
- * blank out between keystrokes.
+ * Sits inside the pay card rather than in a card of its own: it is a detail of
+ * how you get paid, not a separate thing to plan. The input and the breakdown
+ * share a row on wider screens so the figures stay next to the field they come
+ * from instead of being pushed to the far edge.
+ *
+ * The figures are the server's — this only lays them out. While a fresh
+ * breakdown is on its way the last one stays up, so nothing blanks out between
+ * keystrokes.
  */
 export function GrossPayCard({
     gross,
@@ -43,8 +47,11 @@ export function GrossPayCard({
         : [];
 
     return (
-        <Card data-test="gross-pay" className="gap-4">
-            <CardHeader className="gap-1.5">
+        <div
+            data-test="gross-pay"
+            className="grid gap-6 md:grid-cols-[minmax(0,16rem)_minmax(0,1fr)]"
+        >
+            <div className="grid content-start gap-1.5">
                 <Label htmlFor="gross-monthly">Gross monthly pay</Label>
                 <AmountInput
                     id="gross-monthly"
@@ -52,14 +59,13 @@ export function GrossPayCard({
                     value={gross}
                     onValueChange={onGrossChange}
                 />
-                <p className="text-xs text-muted-foreground">
-                    Your basic pay for a regular month, before anything is taken
-                    off.
+                <p className="text-sm text-muted-foreground">
+                    Basic pay for a regular month, before anything comes off.
                 </p>
-            </CardHeader>
+            </div>
 
             {deductions && (
-                <CardContent aria-busy={!isCurrent} className="space-y-3">
+                <div aria-busy={!isCurrent} className="max-w-md space-y-3">
                     {/*
                      * Dimmed with a colour step rather than opacity: a part-faded
                      * block drops muted text under the contrast floor — see the
@@ -67,14 +73,14 @@ export function GrossPayCard({
                      */}
                     <dl
                         className={cn(
-                            'divide-y divide-border rounded-lg border border-border text-sm transition-colors',
-                            !isCurrent && 'bg-muted/40',
+                            'rounded-lg bg-muted/60 px-4 py-1 text-sm transition-colors',
+                            !isCurrent && 'bg-muted',
                         )}
                     >
                         {rows.map((row) => (
                             <div
                                 key={row.key}
-                                className="flex items-baseline justify-between gap-4 px-3 py-2"
+                                className="flex items-baseline justify-between gap-4 py-1.5"
                             >
                                 <dt className="text-muted-foreground">
                                     {row.label}
@@ -87,26 +93,26 @@ export function GrossPayCard({
                                 </dd>
                             </div>
                         ))}
-                        <div className="flex items-baseline justify-between gap-4 px-3 py-2.5">
-                            <dt className="font-medium">Take-home</dt>
+                        <div className="mt-1 flex items-baseline justify-between gap-4 border-t border-border py-2.5">
+                            <dt className="font-semibold">Take-home</dt>
                             <dd
                                 data-test="gross-take-home"
-                                className="text-base font-semibold tabular-nums"
+                                className="text-base font-semibold text-jade tabular-nums"
                             >
                                 {formatPesoExact(deductions.takeHome)}
                             </dd>
                         </div>
                     </dl>
 
-                    <p className="text-xs text-muted-foreground">
-                        An estimate on the {deductions.effectiveYear} rates.
+                    <p className="text-sm text-muted-foreground">
+                        Estimated on the {deductions.effectiveYear} rates.
                         {cadence === 'semi-monthly' &&
                             ' Tax is split across both paychecks; SSS, PhilHealth and Pag-IBIG come off the end of the month.'}{' '}
-                        Correct any payday that comes out different on the
+                        If a payday comes out different, correct it on the
                         payouts page.
                     </p>
-                </CardContent>
+                </div>
             )}
-        </Card>
+        </div>
     );
 }

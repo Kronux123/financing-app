@@ -180,7 +180,7 @@ export default function Debt() {
                                 <div className="grid shrink-0 gap-1.5">
                                     <Label
                                         htmlFor="debt-order"
-                                        className="text-xs font-medium tracking-wide text-muted-foreground uppercase"
+                                        className="text-sm font-medium text-muted-foreground"
                                     >
                                         Order
                                     </Label>
@@ -236,17 +236,39 @@ export default function Debt() {
                                          * div between itself and its terms,
                                          * not two.
                                          */}
-                                        <dt className="min-w-0 text-sm font-medium">
+                                        <dt className="min-w-0 flex-1 text-sm font-medium">
                                             <span className="block truncate">
                                                 {entry.item.name || 'Unnamed'}
                                             </span>
-                                            <span className="block text-xs font-normal text-muted-foreground tabular-nums">
+                                            {/*
+                                             * How far through, as a bar, when
+                                             * the start date makes it knowable.
+                                             * The figure is in the note below
+                                             * for anyone not reading the bar.
+                                             */}
+                                            {debtHistoryFor(
+                                                entry.item,
+                                                today,
+                                            ) && (
+                                                <span
+                                                    aria-hidden
+                                                    className="my-2 block h-1.5 max-w-sm overflow-hidden rounded-full bg-muted"
+                                                >
+                                                    <span
+                                                        className="block h-full rounded-full bg-jade"
+                                                        style={{
+                                                            width: `${Math.round((debtHistoryFor(entry.item, today)?.paidShare ?? 0) * 100)}%`,
+                                                        }}
+                                                    />
+                                                </span>
+                                            )}
+                                            <span className="block text-sm font-normal text-muted-foreground tabular-nums">
                                                 {rowNote(entry)}
                                             </span>
                                             {historyNote(entry, today) && (
                                                 <span
                                                     data-test="debt-history"
-                                                    className="block text-xs font-normal text-muted-foreground tabular-nums"
+                                                    className="block text-sm font-normal text-muted-foreground tabular-nums"
                                                 >
                                                     {historyNote(entry, today)}
                                                 </span>
@@ -258,7 +280,7 @@ export default function Debt() {
                                                     ? '—'
                                                     : formatPeso(entry.owed)}
                                             </span>
-                                            <span className="block text-xs text-muted-foreground tabular-nums">
+                                            <span className="block text-sm text-muted-foreground tabular-nums">
                                                 {formatPeso(entry.payment)} a
                                                 month
                                             </span>
@@ -271,7 +293,7 @@ export default function Debt() {
                 </Card>
 
                 <Button
-                    variant="secondary"
+                    variant="ghost"
                     asChild
                     size="sm"
                     className="self-start"

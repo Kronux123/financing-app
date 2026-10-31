@@ -1,3 +1,4 @@
+import { StatusMeter } from '@/components/finance/status-meter';
 import {
     Card,
     CardContent,
@@ -8,7 +9,6 @@ import {
 import type { BudgetPlan } from '@/lib/budget';
 import { groupTotal, planTotals } from '@/lib/budget';
 import { formatPeso } from '@/lib/currency';
-import { cn } from '@/lib/utils';
 
 type PlanSummaryProps = {
     plan: BudgetPlan;
@@ -17,93 +17,89 @@ type PlanSummaryProps = {
 export function PlanSummary({ plan }: PlanSummaryProps) {
     const { income, allocated, unallocated } = planTotals(plan);
     const isOverAllocated = unallocated < 0;
+    const planned = income > 0 ? (allocated / income) * 100 : 0;
 
     return (
-        <Card className="gap-4">
+        <Card className="gap-5">
             <CardHeader>
-                <CardTitle className="text-base">Monthly rollup</CardTitle>
-                <CardDescription>
-                    Every paycheck combined, across the whole month.
-                </CardDescription>
+                <CardTitle className="text-base">This month</CardTitle>
+                <CardDescription>Every paycheck combined.</CardDescription>
             </CardHeader>
 
-            <CardContent className="space-y-5">
-                <div className="space-y-3">
-                    <div className="flex items-baseline justify-between gap-3">
-                        <p className="text-sm text-muted-foreground">Income</p>
-                        <p
+            <CardContent className="space-y-6">
+                <dl className="grid grid-cols-2 gap-4">
+                    <div>
+                        <dt className="text-sm text-muted-foreground">
+                            Income
+                        </dt>
+                        <dd
                             data-test="plan-income"
                             className="text-lg font-semibold tabular-nums"
                         >
                             {formatPeso(income)}
-                        </p>
+                        </dd>
                     </div>
-                    <div className="flex items-baseline justify-between gap-3">
-                        <p className="text-sm text-muted-foreground">Planned</p>
-                        <p
+                    <div>
+                        <dt className="text-sm text-muted-foreground">
+                            Planned
+                        </dt>
+                        <dd
                             data-test="plan-allocated"
                             className="text-lg font-semibold tabular-nums"
                         >
                             {formatPeso(allocated)}
-                        </p>
+                        </dd>
                     </div>
-                </div>
+                </dl>
 
-                <div
-                    className={cn(
-                        'rounded-lg p-3',
+                <StatusMeter
+                    status={isOverAllocated ? 'Over budget' : 'Unallocated'}
+                    tone={isOverAllocated ? 'bg-goal-behind' : 'bg-goal-met'}
+                    aside={`${Math.round(planned)}% planned`}
+                    figure={
+                        <p
+                            data-test="plan-unallocated"
+                            className="text-2xl font-semibold tracking-tight tabular-nums"
+                        >
+                            {isOverAllocated ? '−' : ''}
+                            {formatPeso(unallocated)}
+                        </p>
+                    }
+                    note={
                         isOverAllocated
-                            ? 'bg-goal-behind/10'
-                            : 'bg-goal-met/10',
-                    )}
-                >
-                    <p className="text-xs font-medium tracking-wide uppercase">
-                        {isOverAllocated ? 'Over budget' : 'Unallocated'}
-                    </p>
-                    <p
-                        data-test="plan-unallocated"
-                        className="mt-1 text-2xl font-semibold tracking-tight tabular-nums"
-                    >
-                        {isOverAllocated ? '−' : ''}
-                        {formatPeso(unallocated)}
-                    </p>
-                    <p className="mt-0.5 text-xs text-foreground/70">
-                        {isOverAllocated
                             ? 'Your plan spends more than you take home.'
-                            : 'Not yet assigned to any group.'}
-                    </p>
-                </div>
+                            : 'Not yet given a job.'
+                    }
+                    percent={planned}
+                    label={`${formatPeso(allocated)} of ${formatPeso(income)} planned`}
+                />
 
-                <div className="space-y-2.5">
-                    <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-                        By group
-                    </p>
+                <div className="space-y-3 border-t border-border pt-5">
+                    <h3 className="text-sm font-semibold">By group</h3>
 
                     {plan.groups.map((group) => {
                         const total = groupTotal(group);
                         const share = income > 0 ? total / income : 0;
 
                         return (
-                            <div key={group.id} className="space-y-1">
-                                <div className="flex items-baseline justify-between gap-3">
-                                    <p className="truncate text-sm">
-                                        {group.name}
-                                    </p>
-                                    <div className="flex shrink-0 items-baseline gap-3">
-                                        <p className="text-sm font-medium tabular-nums">
+                            <div key={group.id} className="space-y-1.5">
+                                <div className="flex items-baseline justify-between gap-3 text-sm">
+                                    <p className="truncate">{group.name}</p>
+                                    <p className="shrink-0 tabular-nums">
+                                        <span className="font-medium">
                                             {formatPeso(total)}
-                                        </p>
-                                        <p className="w-9 text-right text-xs text-muted-foreground tabular-nums">
+                                        </span>
+                                        <span className="ml-2 inline-block w-9 text-right text-muted-foreground">
                                             {Math.round(share * 100)}%
-                                        </p>
-                                    </div>
+                                        </span>
+                                    </p>
                                 </div>
                                 <div
                                     aria-hidden
-                                    className="h-1 overflow-hidden rounded-full bg-foreground/10"
+                                    className="h-1 overflow-hidden rounded-full bg-muted"
                                 >
                                     <div
-                                        className="h-full rounded-full bg-foreground/30 transition-[width] duration-300 motion-reduce:transition-none"
+                                        className="h-full rounded-full bg-foreground/35 transition-[width] duration-300 motion-reduce:transition-none"
                                         style={{
                                             width: `${Math.min(share, 1) * 100}%`,
                                         }}

@@ -88,7 +88,7 @@ export function ActivityPagination({
                 <div className="flex items-center gap-3">
                     <Label
                         htmlFor="rows-per-page"
-                        className="text-xs font-medium tracking-wide text-muted-foreground uppercase"
+                        className="text-sm font-medium text-muted-foreground"
                     >
                         Rows per page
                     </Label>

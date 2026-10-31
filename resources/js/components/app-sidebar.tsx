@@ -63,17 +63,7 @@ export function AppSidebar() {
          * backdrop on every signed-in page. Floating makes the sidebar its own
          * rounded panel and leaves the background alone.
          */
-        /*
-         * The glass treatment is applied from here rather than by editing
-         * `ui/sidebar.tsx`, so the shared primitive keeps its defaults and
-         * nothing else in the app inherits it. `glass-panel` carries the blur,
-         * the tint and the specular edges — see `app.css`.
-         */
-        <Sidebar
-            collapsible="icon"
-            variant="floating"
-            className="[&_[data-sidebar=sidebar]]:glass-panel"
-        >
+        <Sidebar collapsible="icon" variant="floating">
             <SidebarHeader>
                 <SidebarMenu>
                     <SidebarMenuItem>

@@ -14,6 +14,7 @@ import {
 import { DashboardOnboarding } from '@/components/dashboard/dashboard-onboarding';
 import { EmptyPanel } from '@/components/dashboard/empty-panel';
 import { SavingsChart } from '@/components/dashboard/savings-chart';
+import { PageHeader } from '@/components/page-header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useStoredBudgetPlan } from '@/hooks/use-budget-plan';
@@ -203,17 +204,13 @@ function ChartGhost() {
 
 function OverviewHeader() {
     return (
-        <header className="flex flex-wrap items-baseline justify-between gap-3">
-            <h1 className="text-2xl font-semibold tracking-tight">
-                Savings overview
-            </h1>
-            <p className="text-sm text-muted-foreground">
-                {new Date().toLocaleDateString('en-US', {
-                    month: 'long',
-                    year: 'numeric',
-                })}
-            </p>
-        </header>
+        <PageHeader
+            title="Savings overview"
+            description={new Date().toLocaleDateString('en-US', {
+                month: 'long',
+                year: 'numeric',
+            })}
+        />
     );
 }
 
@@ -289,89 +286,101 @@ export default function Dashboard({
             <div className="flex w-full flex-col gap-6 p-4 md:p-6">
                 <OverviewHeader />
 
-                <Card>
-                    <CardContent className="flex flex-col gap-6 p-6 lg:flex-row lg:items-end lg:justify-between">
-                        <div className="min-w-0">
-                            <p className="flex items-center gap-2 text-sm text-muted-foreground">
-                                <span className="flex size-7 items-center justify-center rounded-md bg-emerald-500/10 text-emerald-700 dark:text-emerald-300">
-                                    <PiggyBank aria-hidden className="size-4" />
-                                </span>
-                                Total saved
-                            </p>
-                            <p
-                                data-test="dashboard-saved"
-                                className="mt-1 text-4xl font-semibold tracking-tight tabular-nums"
-                            >
-                                {formatPeso(totalSaved)}
-                            </p>
-                            <p className="mt-2 text-sm text-muted-foreground tabular-nums">
-                                {formatPeso(savedPerMonth)} a month going in
-                            </p>
+                {/*
+                 * What you have and what is protecting it, side by side. They
+                 * were two full-width cards, which pushed each figure's label
+                 * to the opposite edge of the screen from the figure itself.
+                 */}
+                <Card className="py-0">
+                    <CardContent className="grid gap-0 px-0 lg:grid-cols-[minmax(0,1fr)_minmax(0,26rem)]">
+                        <div className="space-y-6 p-6">
+                            <div>
+                                <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                                    <PiggyBank
+                                        aria-hidden
+                                        className="size-4 text-jade"
+                                    />
+                                    Total saved
+                                </p>
+                                <p
+                                    data-test="dashboard-saved"
+                                    className="mt-1 text-4xl font-semibold tracking-tight tabular-nums"
+                                >
+                                    {formatPeso(totalSaved)}
+                                </p>
+                                <p className="mt-1 text-sm text-muted-foreground tabular-nums">
+                                    {formatPeso(savedPerMonth)} a month going in
+                                </p>
+                            </div>
+
+                            <dl className="flex flex-wrap gap-x-10 gap-y-4">
+                                {savingsBreakdown.map((stat) => (
+                                    <div key={stat.label}>
+                                        <dt className="text-sm text-muted-foreground">
+                                            {stat.label}
+                                        </dt>
+                                        <dd className="mt-0.5 text-lg font-semibold tabular-nums">
+                                            {formatPeso(stat.value)}
+                                        </dd>
+                                    </div>
+                                ))}
+                            </dl>
                         </div>
 
-                        <dl className="flex shrink-0 gap-8">
-                            {savingsBreakdown.map((stat) => (
-                                <div key={stat.label}>
-                                    <dt className="text-sm text-muted-foreground">
-                                        {stat.label}
-                                    </dt>
-                                    <dd className="mt-1 text-xl font-semibold tabular-nums">
-                                        {formatPeso(stat.value)}
-                                    </dd>
-                                </div>
-                            ))}
-                        </dl>
-                    </CardContent>
-                </Card>
+                        <div className="space-y-3 border-t border-border p-6 lg:border-t-0 lg:border-l">
+                            <div className="flex items-center justify-between gap-4">
+                                <h2 className="flex items-center gap-2 text-sm font-semibold">
+                                    <ShieldCheck
+                                        aria-hidden
+                                        className="size-4 text-muted-foreground"
+                                    />
+                                    Emergency fund
+                                </h2>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="-mr-2"
+                                    asChild
+                                >
+                                    <Link href={financeRoute()}>Adjust</Link>
+                                </Button>
+                            </div>
 
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between gap-4">
-                        <CardTitle className="flex items-center gap-2 text-base">
-                            <ShieldCheck
-                                aria-hidden
-                                className="size-4 text-muted-foreground"
-                            />
-                            Emergency fund
-                        </CardTitle>
-                        <Button variant="ghost" size="sm" asChild>
-                            <Link href={financeRoute()}>Adjust</Link>
-                        </Button>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-                            <p
-                                data-test="dashboard-fund"
-                                className="text-2xl font-semibold tracking-tight tabular-nums"
-                            >
-                                {formatPeso(fund.balance)}
-                            </p>
-                            <p className="text-sm text-muted-foreground tabular-nums">
-                                {fund.target > 0
-                                    ? `of ${formatPeso(fund.target)} target · ${fund.percent}% funded`
-                                    : 'not sized yet'}
-                            </p>
-                        </div>
+                            <div>
+                                <p
+                                    data-test="dashboard-fund"
+                                    className="text-2xl font-semibold tracking-tight tabular-nums"
+                                >
+                                    {formatPeso(fund.balance)}
+                                </p>
+                                <p className="text-sm text-muted-foreground tabular-nums">
+                                    {fund.target > 0
+                                        ? `of ${formatPeso(fund.target)} target, ${fund.percent}% funded`
+                                        : 'not sized yet'}
+                                </p>
+                            </div>
 
-                        <div
-                            role="progressbar"
-                            aria-valuenow={fund.percent}
-                            aria-valuemin={0}
-                            aria-valuemax={100}
-                            aria-label="Emergency fund progress"
-                            className="mt-3 h-2 w-full overflow-hidden rounded-full bg-muted"
-                        >
                             <div
-                                className="h-full rounded-full bg-emerald-600 transition-[width] duration-500 motion-reduce:transition-none dark:bg-emerald-400"
-                                style={{ width: `${fund.percent}%` }}
-                            />
-                        </div>
+                                role="progressbar"
+                                aria-valuenow={fund.percent}
+                                aria-valuemin={0}
+                                aria-valuemax={100}
+                                aria-label="Emergency fund progress"
+                                className="h-1.5 w-full overflow-hidden rounded-full bg-muted"
+                            >
+                                <div
+                                    className="h-full rounded-full bg-jade transition-[width] duration-500 motion-reduce:transition-none"
+                                    style={{ width: `${fund.percent}%` }}
+                                />
+                            </div>
 
-                        <p
-                            data-test="dashboard-fund-note"
-                            className="mt-2 text-xs text-muted-foreground"
-                        >
-                            {fundNote(fund)}
-                        </p>
+                            <p
+                                data-test="dashboard-fund-note"
+                                className="text-sm text-muted-foreground"
+                            >
+                                {fundNote(fund)}
+                            </p>
+                        </div>
                     </CardContent>
                 </Card>
 
@@ -395,7 +404,7 @@ export default function Dashboard({
                                     <dd
                                         className={`mt-1 text-2xl font-semibold tabular-nums ${
                                             metric.value > 0
-                                                ? 'text-emerald-700 dark:text-emerald-400'
+                                                ? 'text-jade'
                                                 : 'text-foreground'
                                         }`}
                                     >
@@ -404,7 +413,7 @@ export default function Dashboard({
                                             : formatPeso(metric.value)}
                                     </dd>
                                 </dl>
-                                <p className="mt-1 text-xs text-muted-foreground">
+                                <p className="mt-1 text-sm text-muted-foreground">
                                     {metric.note}
                                 </p>
                             </CardContent>
@@ -498,7 +507,7 @@ export default function Dashboard({
                                             <span className="text-sm font-medium tabular-nums">
                                                 {formatPeso(item.amount)}
                                             </span>
-                                            <span className="w-9 text-right text-xs text-muted-foreground tabular-nums">
+                                            <span className="w-9 text-right text-sm text-muted-foreground tabular-nums">
                                                 {share}%
                                             </span>
                                         </div>
@@ -555,7 +564,7 @@ export default function Dashboard({
                                     <span
                                         className={`flex size-8 shrink-0 items-center justify-center rounded-full ${
                                             item.amount > 0
-                                                ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
+                                                ? 'bg-jade/10 text-jade-ink'
                                                 : 'bg-muted text-muted-foreground'
                                         }`}
                                     >
@@ -575,7 +584,7 @@ export default function Dashboard({
                                         <p className="truncate text-sm font-medium">
                                             {item.title}
                                         </p>
-                                        <p className="text-xs text-muted-foreground">
+                                        <p className="text-sm text-muted-foreground">
                                             {formatActivityDate(item.date)}
                                             {item.status === 'pending' &&
                                                 ' · Pending'}
@@ -585,7 +594,7 @@ export default function Dashboard({
                                 <p
                                     className={`shrink-0 text-sm font-medium tabular-nums ${
                                         item.amount > 0
-                                            ? 'text-emerald-700 dark:text-emerald-400'
+                                            ? 'text-jade'
                                             : 'text-foreground'
                                     }`}
                                 >

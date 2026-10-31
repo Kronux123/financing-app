@@ -1,5 +1,6 @@
 import { ArrowRight } from 'lucide-react';
 import { AmountInput } from '@/components/finance/amount-input';
+import { StatusMeter } from '@/components/finance/status-meter';
 import {
     Card,
     CardContent,
@@ -12,7 +13,6 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import type { BudgetPlan, SavingsSplit } from '@/lib/budget';
 import { coverOptions, savingsSplit } from '@/lib/budget';
 import { formatPeso } from '@/lib/currency';
-import { cn } from '@/lib/utils';
 
 type SavingsCardProps = {
     plan: BudgetPlan;
@@ -29,11 +29,10 @@ type SavingsCardProps = {
 const statusFor = (
     target: number,
     gap: number,
-): { label: string; surface: string; mark: string } => {
+): { label: string; mark: string } => {
     if (target <= 0) {
         return {
             label: 'Not sized yet',
-            surface: 'bg-muted',
             mark: 'bg-foreground/30',
         };
     }
@@ -41,14 +40,12 @@ const statusFor = (
     if (gap <= 0) {
         return {
             label: 'Fully funded',
-            surface: 'bg-goal-met/10',
             mark: 'bg-goal-met',
         };
     }
 
     return {
         label: 'Building',
-        surface: 'bg-goal-close/10',
         mark: 'bg-goal-close',
     };
 };
@@ -93,18 +90,16 @@ export function SavingsCard({
     ];
 
     return (
-        <Card className="gap-4">
+        <Card className="gap-5">
             <CardHeader>
                 <CardTitle className="text-base">Savings</CardTitle>
                 <CardDescription>
-                    The emergency fund fills first —{' '}
-                    {plan.emergencyFund.monthsOfCover} months of payables and
-                    allowance, for when the income stops. What is left over
-                    lands in the pot.
+                    The emergency fund fills first, then the rest goes to the
+                    pot.
                 </CardDescription>
             </CardHeader>
 
-            <CardContent className="space-y-5">
+            <CardContent className="space-y-6">
                 <div className="grid gap-2">
                     <Label htmlFor="months-of-cover">Months of cover</Label>
                     <ToggleGroup
@@ -153,70 +148,49 @@ export function SavingsCard({
                     </div>
                 </div>
 
-                <p className="-mt-3 text-xs text-muted-foreground">
-                    Both are your own figures. The plan plots what is coming,
-                    not what your accounts hold.
+                <p className="-mt-3 text-sm text-muted-foreground">
+                    What your accounts hold today. Update these by hand.
                 </p>
 
-                <div className={cn('rounded-lg p-3', status.surface)}>
-                    <div className="flex items-baseline justify-between gap-2">
-                        <p className="text-xs font-medium tracking-wide uppercase">
-                            {status.label}
+                {/*
+                 * The balance leads and the target follows, matching the
+                 * dashboard. Leading with the target read as though the figure
+                 * you had just typed had been ignored.
+                 */}
+                <StatusMeter
+                    status={status.label}
+                    tone={status.mark}
+                    aside={target > 0 ? `${percent}% funded` : undefined}
+                    figure={
+                        <p
+                            data-test="fund-balance-shown"
+                            className="text-2xl font-semibold tracking-tight tabular-nums"
+                        >
+                            {formatPeso(balance)}
                         </p>
-                        {target > 0 && (
-                            <p className="text-xs text-foreground/70 tabular-nums">
-                                {percent}% funded
-                            </p>
-                        )}
-                    </div>
-
-                    {/*
-                     * The balance leads and the target follows, matching the
-                     * dashboard. Leading with the target read as though the
-                     * figure you had just typed had been ignored.
-                     */}
-                    <p
-                        data-test="fund-balance-shown"
-                        className="mt-1.5 text-2xl font-semibold tracking-tight tabular-nums"
-                    >
-                        {formatPeso(balance)}
-                    </p>
-                    <p className="text-xs text-foreground/70 tabular-nums">
-                        {target <= 0 ? (
-                            'set aside · add payables and allowance to size this'
+                    }
+                    note={
+                        target <= 0 ? (
+                            'Add payables and allowance to size the fund.'
                         ) : (
                             <>
                                 of{' '}
                                 <span data-test="fund-target">
                                     {formatPeso(target)}
                                 </span>{' '}
-                                target · {formatPeso(gap)} to go
+                                for {plan.emergencyFund.monthsOfCover} months,{' '}
+                                {formatPeso(gap)} to go
                             </>
-                        )}
-                    </p>
+                        )
+                    }
+                    percent={percent}
+                    label={`Emergency fund: ${formatPeso(balance)} of ${formatPeso(target)}, ${percent} percent — ${status.label}`}
+                />
 
-                    <div
-                        role="progressbar"
-                        aria-valuenow={percent}
-                        aria-valuemin={0}
-                        aria-valuemax={100}
-                        aria-label={`Emergency fund: ${formatPeso(balance)} of ${formatPeso(target)}, ${percent} percent — ${status.label}`}
-                        className="mt-3 h-1.5 overflow-hidden rounded-full bg-foreground/10"
-                    >
-                        <div
-                            className={cn(
-                                'h-full rounded-full transition-[width] duration-300 motion-reduce:transition-none',
-                                status.mark,
-                            )}
-                            style={{ width: `${percent}%` }}
-                        />
-                    </div>
-                </div>
-
-                <div className="space-y-2.5">
-                    <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                <div className="space-y-3 border-t border-border pt-5">
+                    <h3 className="text-sm font-semibold">
                         Where this month&rsquo;s {formatPeso(saved)} goes
-                    </p>
+                    </h3>
 
                     {flow.map((step) => (
                         <div
@@ -241,7 +215,7 @@ export function SavingsCard({
 
                     <p
                         data-test="fund-forecast"
-                        className="text-xs text-muted-foreground"
+                        className="text-sm text-muted-foreground"
                     >
                         {forecastFor(split)}
                     </p>

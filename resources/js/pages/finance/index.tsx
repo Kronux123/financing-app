@@ -5,7 +5,9 @@ import { GrossPayCard } from '@/components/finance/gross-pay-card';
 import { PaycheckCard } from '@/components/finance/paycheck-card';
 import { PlanSummary } from '@/components/finance/plan-summary';
 import { SavingsCard } from '@/components/finance/savings-card';
+import { PageHeader } from '@/components/page-header';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { useBudgetPlanDraft } from '@/hooks/use-budget-plan';
@@ -181,112 +183,123 @@ export default function Finance() {
             <Head title="Budget plan" />
 
             <div className="flex w-full flex-col gap-6 p-4 md:p-6">
-                <header className="flex flex-wrap items-end justify-between gap-4">
-                    <div>
-                        <h1 className="text-2xl font-semibold tracking-tight">
-                            Budget plan
-                        </h1>
-                        <p className="mt-1 text-sm text-muted-foreground">
-                            Set how you get paid, then give every peso a job
-                            before it arrives.
-                        </p>
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                        {isDirty && (
-                            <span className="text-sm text-muted-foreground">
-                                Unsaved changes
-                            </span>
-                        )}
-                        <Button
-                            data-test="save-plan"
-                            disabled={!isDirty}
-                            onClick={handleSave}
-                        >
-                            Save plan
-                        </Button>
-                    </div>
-                </header>
-
-                <div className="grid items-start gap-6 xl:grid-cols-[1.7fr_1fr]">
-                    <div className="space-y-4">
-                        <div className="grid gap-2">
-                            <Label htmlFor="cadence">How you get paid</Label>
-                            <ToggleGroup
-                                id="cadence"
-                                type="single"
-                                variant="outline"
-                                value={plan.cadence}
-                                onValueChange={handleCadenceChange}
-                                className="w-full sm:w-auto"
+                <PageHeader
+                    title="Budget plan"
+                    description="Set how you get paid, then give every peso a job before it arrives."
+                    actions={
+                        <>
+                            {isDirty && (
+                                <span className="text-sm text-muted-foreground">
+                                    Unsaved changes
+                                </span>
+                            )}
+                            <Button
+                                data-test="save-plan"
+                                disabled={!isDirty}
+                                onClick={handleSave}
                             >
-                                {cadenceOptions.map((option) => (
-                                    <ToggleGroupItem
-                                        key={option.value}
-                                        value={option.value}
-                                        data-test={`cadence-${option.value}`}
-                                        className="px-4"
+                                Save plan
+                            </Button>
+                        </>
+                    }
+                />
+
+                <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_22rem] 2xl:grid-cols-[minmax(0,1fr)_24rem]">
+                    <div className="min-w-0 space-y-6">
+                        <Card className="gap-0 py-0">
+                            <CardContent className="divide-y divide-border px-0">
+                                <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 px-6 py-5">
+                                    <div className="min-w-0">
+                                        <Label htmlFor="cadence">
+                                            How you get paid
+                                        </Label>
+                                        <p className="mt-1 text-sm text-muted-foreground">
+                                            {plan.cadence === 'semi-monthly'
+                                                ? 'Twice a month, on the 15th and the last day.'
+                                                : 'Once a month, on the last day.'}
+                                        </p>
+                                    </div>
+                                    <ToggleGroup
+                                        id="cadence"
+                                        type="single"
+                                        variant="outline"
+                                        value={plan.cadence}
+                                        onValueChange={handleCadenceChange}
                                     >
-                                        {option.label}
-                                    </ToggleGroupItem>
-                                ))}
-                            </ToggleGroup>
-                            <p className="text-xs text-muted-foreground">
-                                {plan.cadence === 'semi-monthly'
-                                    ? 'Twice a month — the 15th and the last day.'
-                                    : 'Once a month, on the last day.'}
-                            </p>
-                        </div>
+                                        {cadenceOptions.map((option) => (
+                                            <ToggleGroupItem
+                                                key={option.value}
+                                                value={option.value}
+                                                data-test={`cadence-${option.value}`}
+                                                className="px-4"
+                                            >
+                                                {option.label}
+                                            </ToggleGroupItem>
+                                        ))}
+                                    </ToggleGroup>
+                                </div>
 
-                        <div className="grid gap-2">
-                            <Label htmlFor="pay-basis">What you enter</Label>
-                            <ToggleGroup
-                                id="pay-basis"
-                                type="single"
-                                variant="outline"
-                                value={fromGross ? 'gross' : 'take-home'}
-                                onValueChange={handlePayBasisChange}
-                                className="w-full sm:w-auto"
-                            >
-                                <ToggleGroupItem
-                                    value="take-home"
-                                    data-test="pay-basis-take-home"
-                                    className="px-4"
-                                >
-                                    Take-home
-                                </ToggleGroupItem>
-                                <ToggleGroupItem
-                                    value="gross"
-                                    data-test="pay-basis-gross"
-                                    className="px-4"
-                                >
-                                    Gross
-                                </ToggleGroupItem>
-                            </ToggleGroup>
-                            <p className="text-xs text-muted-foreground">
-                                {fromGross
-                                    ? 'SSS, PhilHealth, Pag-IBIG and tax are worked out for you.'
-                                    : 'What actually lands in your account.'}
-                            </p>
-                        </div>
+                                <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 px-6 py-5">
+                                    <div className="min-w-0">
+                                        <Label htmlFor="pay-basis">
+                                            What you enter
+                                        </Label>
+                                        <p className="mt-1 text-sm text-muted-foreground">
+                                            {fromGross
+                                                ? 'Your gross. SSS, PhilHealth, Pag-IBIG and tax are worked out for you.'
+                                                : 'What actually lands in your account.'}
+                                        </p>
+                                    </div>
+                                    <ToggleGroup
+                                        id="pay-basis"
+                                        type="single"
+                                        variant="outline"
+                                        value={
+                                            fromGross ? 'gross' : 'take-home'
+                                        }
+                                        onValueChange={handlePayBasisChange}
+                                    >
+                                        <ToggleGroupItem
+                                            value="take-home"
+                                            data-test="pay-basis-take-home"
+                                            className="px-4"
+                                        >
+                                            Take-home
+                                        </ToggleGroupItem>
+                                        <ToggleGroupItem
+                                            value="gross"
+                                            data-test="pay-basis-gross"
+                                            className="px-4"
+                                        >
+                                            Gross
+                                        </ToggleGroupItem>
+                                    </ToggleGroup>
+                                </div>
 
-                        {fromGross && (
-                            <GrossPayCard
-                                gross={plan.grossMonthly ?? 0}
-                                cadence={plan.cadence}
-                                deductions={deductions}
-                                isCurrent={isCurrent}
-                                onGrossChange={(grossMonthly) =>
-                                    updatePlan({ ...plan, grossMonthly })
-                                }
-                            />
-                        )}
+                                {fromGross && (
+                                    <div className="px-6 py-5">
+                                        <GrossPayCard
+                                            gross={plan.grossMonthly ?? 0}
+                                            cadence={plan.cadence}
+                                            deductions={deductions}
+                                            isCurrent={isCurrent}
+                                            onGrossChange={(grossMonthly) =>
+                                                updatePlan({
+                                                    ...plan,
+                                                    grossMonthly,
+                                                })
+                                            }
+                                        />
+                                    </div>
+                                )}
+                            </CardContent>
+                        </Card>
 
                         <div
                             className={
                                 plan.cadence === 'semi-monthly'
-                                    ? 'grid gap-4 md:grid-cols-2'
-                                    : 'grid gap-4'
+                                    ? 'grid items-start gap-6 lg:grid-cols-2'
+                                    : 'grid gap-6'
                             }
                         >
                             {plan.paychecks.map((paycheck) => (
@@ -318,7 +331,11 @@ export default function Finance() {
                         </div>
                     </div>
 
-                    <div className="space-y-4">
+                    {/*
+                     * Stays in view on wide screens, so the month's totals answer
+                     * every edit without scrolling back up to check them.
+                     */}
+                    <aside className="space-y-6 xl:sticky xl:top-6">
                         <PlanSummary plan={plan} />
 
                         <SavingsCard
@@ -337,10 +354,10 @@ export default function Finance() {
                             }
                         />
 
-                        <Button variant="secondary" asChild size="sm">
+                        <Button variant="ghost" asChild size="sm">
                             <Link href={dashboard()}>Back to dashboard</Link>
                         </Button>
-                    </div>
+                    </aside>
                 </div>
             </div>
         </>
