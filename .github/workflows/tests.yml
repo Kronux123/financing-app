@@ -21,6 +21,32 @@ jobs:
       matrix:
         php-version: ['8.4', '8.5']
 
+    # Production runs Postgres, so CI does too. Locally the suite stays on
+    # in-memory SQLite for speed: phpunit.xml's <env> entries only fill in
+    # variables that are not already set, so the job's env below wins here.
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: testing
+          POSTGRES_USER: kept
+          POSTGRES_PASSWORD: kept
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U kept -d testing"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DB_CONNECTION: pgsql
+      DB_HOST: 127.0.0.1
+      DB_PORT: 5432
+      DB_DATABASE: testing
+      DB_USERNAME: kept
+      DB_PASSWORD: kept
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -30,6 +56,7 @@ jobs:
         with:
           php-version: ${{ matrix.php-version }}
           tools: composer:v2
+          extensions: pdo_pgsql
           coverage: xdebug
 
       - name: Setup Node
