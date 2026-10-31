@@ -11,6 +11,13 @@ Tailwind's -400/-500/-600 emerald and rose steps fail axe's 4.5:1 contrast at 14
 
 `assertNoAccessibilityIssues()` in both modes is what catches this; add it when a page gets tinted text.
 
+## Colour comes from the slate-and-jade tokens, and jade on a jade tint is `jade-ink`
+Use the theme tokens in `app.css` (`text-jade`, `bg-jade/10`, `text-amber`, `text-destructive`, `bg-muted`, `text-muted-foreground`) rather than Tailwind palette steps like `text-emerald-700` — the tokens carry their own light and dark values, so no `dark:` pair is needed.
+
+Jade text sitting on its own tint (`bg-jade/10`, a badge or a status pill) uses `text-jade-ink`, not `text-jade`: plain jade on the tint measured 4.27:1 and failed axe. Plain `text-jade` is fine on a card or the page.
+
+The light theme is deliberately dimmed off white (page `#e6eaf0`, card `#f5f7fa`), and muted text, jade and destructive were darkened to keep 4.5:1 on it. If you lighten or darken `--background` or `--card`, rerun the browser suite — the activity log's red amounts were the first to fail last time.
+
 ## Every page wrapper is the same, and it is not centred
 The outer div of a page inside the app layout is `flex w-full flex-col gap-6 p-4 md:p-6`. No `mx-auto`, no `max-w-*` — the sidebar already sets the reading width, and a second cap inside it left the content floating in a narrow column with dead space either side.
 
