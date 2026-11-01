@@ -270,6 +270,137 @@
 }
 
 /**
+ * A bar on the dashboard's savings chart growing up from the baseline. Same
+ * reasoning as `goal-bar`: a transform, so the figure above it is never faded.
+ * Each bar sets its own `animation-delay` to stagger the row.
+ */
+@keyframes chart-bar-rise {
+    from {
+        transform: scaleY(0);
+    }
+}
+
+@utility chart-bar-rise {
+    transform-origin: bottom;
+    animation: chart-bar-rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+
+    @media (prefers-reduced-motion: reduce) {
+        animation: none;
+    }
+}
+
+/**
+ * Idle motion for the pixel-art sprites (`components/pixel-art.tsx`).
+ *
+ * Each applies to an SVG layer, so a 1px translate moves the layer by one
+ * cell of the sprite, not one screen pixel. Most use `steps()` so the motion
+ * jumps cell by cell like a real sprite rather than gliding. The loops are
+ * slow on purpose: these sit beside figures people are reading.
+ *
+ * Opacity is fine here — the sprites are `aria-hidden` SVG with no text in
+ * them, so there is nothing for the contrast floor to measure.
+ */
+@keyframes pixel-drop {
+    0% {
+        transform: translateY(-3px);
+        opacity: 0;
+    }
+    15% {
+        opacity: 1;
+    }
+    55% {
+        transform: translateY(3px);
+        opacity: 1;
+    }
+    62%,
+    100% {
+        transform: translateY(3px);
+        opacity: 0;
+    }
+}
+
+@keyframes pixel-rain {
+    from {
+        transform: translateY(-2px);
+    }
+    to {
+        transform: translateY(2px);
+    }
+}
+
+@keyframes pixel-twinkle {
+    0%,
+    100% {
+        opacity: 0.15;
+    }
+    50% {
+        opacity: 1;
+    }
+}
+
+@keyframes pixel-bob {
+    0%,
+    100% {
+        transform: translateY(0);
+    }
+    50% {
+        transform: translateY(-1px);
+    }
+}
+
+@keyframes pixel-frame {
+    0%,
+    49.99% {
+        opacity: 1;
+    }
+    50%,
+    100% {
+        opacity: 0;
+    }
+}
+
+@utility pixel-drop {
+    animation: pixel-drop 2.6s steps(12) infinite;
+}
+
+@utility pixel-rain {
+    animation: pixel-rain 0.9s steps(4) infinite;
+}
+
+@utility pixel-twinkle {
+    animation: pixel-twinkle 2.2s steps(4) infinite;
+}
+
+@utility pixel-bob {
+    animation: pixel-bob 1.8s steps(2) infinite;
+}
+
+/* Two frames that take turns, for a flag waving. */
+@utility pixel-frame-a {
+    animation: pixel-frame 0.8s infinite;
+}
+
+@utility pixel-frame-b {
+    animation: pixel-frame 0.8s infinite reverse;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .pixel-drop,
+    .pixel-rain,
+    .pixel-twinkle,
+    .pixel-bob,
+    .pixel-frame-a,
+    .pixel-frame-b {
+        animation: none;
+    }
+
+    /* The second flag frame would sit on top of the first, so hide it. */
+    .pixel-frame-b {
+        opacity: 0;
+    }
+}
+
+/**
  * A ruled grid, faded out where it would compete with text.
  *
  * The line colour is `--ring` rather than `--border`: at oklch lightness 0.269
@@ -287,4 +418,62 @@
         black 15%,
         transparent 80%
     );
+}
+
+/**
+ * The same ruling in jade, lit up under the mouse on the landing page.
+ *
+ * It has no mask of its own: `LandingBackdrop` sets one at the pointer, so the
+ * only part of this grid that ever shows is a circle around the cursor. The
+ * size has to match `page-grid` exactly or the two rulings drift apart.
+ */
+@utility landing-grid-lit {
+    background-image:
+        linear-gradient(to right, var(--jade) 1px, transparent 1px),
+        linear-gradient(to bottom, var(--jade) 1px, transparent 1px);
+    background-size: 4.5rem 4.5rem;
+}
+
+/**
+ * Two fields of pinpoint dots behind the landing page grid.
+ *
+ * Each field stacks two offset dot patterns on tile sizes that share no common
+ * factor, so the repeat is too long to notice. The far field is smaller and
+ * fainter and `LandingBackdrop` moves it the least; that difference is the
+ * whole parallax. Both fade out toward the bottom where the content gets dense.
+ */
+@utility landing-stars-far {
+    background-image:
+        radial-gradient(
+            circle at 20% 30%,
+            color-mix(in oklch, var(--foreground) 35%, transparent) 0.6px,
+            transparent 1.2px
+        ),
+        radial-gradient(
+            circle at 70% 80%,
+            color-mix(in oklch, var(--foreground) 25%, transparent) 0.5px,
+            transparent 1px
+        );
+    background-size:
+        7.3rem 6.1rem,
+        5.3rem 8.7rem;
+    mask-image: linear-gradient(to bottom, black 30%, transparent 95%);
+}
+
+@utility landing-stars-near {
+    background-image:
+        radial-gradient(
+            circle at 40% 60%,
+            color-mix(in oklch, var(--jade) 55%, transparent) 0.9px,
+            transparent 1.8px
+        ),
+        radial-gradient(
+            circle at 85% 15%,
+            color-mix(in oklch, var(--goal-close) 50%, transparent) 0.8px,
+            transparent 1.6px
+        );
+    background-size:
+        13.1rem 11.3rem,
+        17.9rem 15.7rem;
+    mask-image: linear-gradient(to bottom, black 20%, transparent 90%);
 }

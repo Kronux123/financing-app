@@ -1,4 +1,5 @@
 import { StatusMeter } from '@/components/finance/status-meter';
+import { PixelArt } from '@/components/pixel-art';
 import {
     Card,
     CardContent,
@@ -22,7 +23,10 @@ export function PlanSummary({ plan }: PlanSummaryProps) {
     return (
         <Card className="gap-5">
             <CardHeader>
-                <CardTitle className="text-base">This month</CardTitle>
+                <CardTitle className="flex items-center gap-2.5 text-base">
+                    <PixelArt sprite="envelope" size={32} />
+                    This month
+                </CardTitle>
                 <CardDescription>Every paycheck combined.</CardDescription>
             </CardHeader>
 

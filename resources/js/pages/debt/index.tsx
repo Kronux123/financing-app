@@ -1,5 +1,6 @@
 import { Head, Link } from '@inertiajs/react';
 import { useState } from 'react';
+import { SpriteTile } from '@/components/pixel-art';
 import { Button } from '@/components/ui/button';
 import {
     Card,
@@ -124,15 +125,18 @@ export default function Debt() {
 
             <div className="flex w-full flex-col gap-6 p-4 md:p-6">
                 <header className="flex flex-wrap items-end justify-between gap-4">
-                    <div>
-                        <h1 className="text-2xl font-semibold tracking-tight">
-                            Debt
-                        </h1>
-                        <p className="mt-1 max-w-xl text-sm text-muted-foreground">
-                            Every payable you have ticked as debt, and what is
-                            left on it. Nothing is entered here — a debt is a
-                            payable, so the plan is where you edit one.
-                        </p>
+                    <div className="flex items-center gap-4">
+                        <SpriteTile sprite="mountain" />
+                        <div>
+                            <h1 className="text-2xl font-semibold tracking-tight">
+                                Debt
+                            </h1>
+                            <p className="mt-1 max-w-xl text-sm text-muted-foreground">
+                                Every payable you have ticked as debt, and what
+                                is left on it. Nothing is entered here — a debt
+                                is a payable, so the plan is where you edit one.
+                            </p>
+                        </div>
                     </div>
 
                     <Button variant="secondary" size="sm" asChild>

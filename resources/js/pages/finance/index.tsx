@@ -195,6 +195,7 @@ export default function Finance() {
 
             <div className="flex w-full flex-col gap-6 p-4 md:p-6">
                 <PageHeader
+                    art="calculator"
                     title="Budget plan"
                     description="Set how you get paid, then give every peso a job before it arrives."
                     actions={
@@ -310,10 +311,14 @@ export default function Finance() {
                             </CardContent>
                         </Card>
 
+                        {/*
+                         * The paycheck cards are subgrids of this one, so its
+                         * rows are what line their sections up side by side.
+                         */}
                         <div
                             className={
                                 plan.cadence === 'semi-monthly'
-                                    ? 'grid items-start gap-6 lg:grid-cols-2'
+                                    ? 'grid gap-6 lg:grid-cols-2'
                                     : 'grid gap-6'
                             }
                         >

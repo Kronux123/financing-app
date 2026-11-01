@@ -90,6 +90,7 @@ export default function ActivitiesPage({
 
             <div className="flex w-full flex-1 flex-col gap-6 overflow-x-auto p-4 md:p-6">
                 <PageHeader
+                    art="receipt"
                     title="Activities"
                     description="Every payday you have recorded: what came in, what went out, and what is still open to correction."
                     actions={

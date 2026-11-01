@@ -1,9 +1,7 @@
 import { Head, Link } from '@inertiajs/react';
 import {
-    Activity,
     ArrowDownRight,
     ArrowUpRight,
-    ChartColumn,
     Landmark,
     PiggyBank,
     ShieldCheck,
@@ -15,6 +13,7 @@ import { FundRing } from '@/components/dashboard/fund-ring';
 import { PayFlow } from '@/components/dashboard/pay-flow';
 import { SavingsChart } from '@/components/dashboard/savings-chart';
 import { PageHeader } from '@/components/page-header';
+import { PixelArt } from '@/components/pixel-art';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useStoredBudgetPlan } from '@/hooks/use-budget-plan';
@@ -192,6 +191,7 @@ const fundNote = ({ target, gap, monthsToFill }: FundFigures): string => {
 function OverviewHeader() {
     return (
         <PageHeader
+            art="wallet"
             title="Savings overview"
             description={new Date().toLocaleDateString('en-US', {
                 month: 'long',
@@ -283,16 +283,24 @@ export default function Dashboard({
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">
-                            <div>
-                                <p
-                                    data-test="dashboard-saved"
-                                    className="text-3xl font-semibold tracking-tight tabular-nums"
-                                >
-                                    {formatPeso(totalSaved)}
-                                </p>
-                                <p className="mt-1 text-sm text-muted-foreground tabular-nums">
-                                    {formatPeso(savedPerMonth)} a month going in
-                                </p>
+                            <div className="flex items-start justify-between gap-4">
+                                <div>
+                                    <p
+                                        data-test="dashboard-saved"
+                                        className="text-3xl font-semibold tracking-tight tabular-nums"
+                                    >
+                                        {formatPeso(totalSaved)}
+                                    </p>
+                                    <p className="mt-1 text-sm text-muted-foreground tabular-nums">
+                                        {formatPeso(savedPerMonth)} a month
+                                        going in
+                                    </p>
+                                </div>
+                                <PixelArt
+                                    sprite="piggy-bank"
+                                    size={80}
+                                    className="-my-6"
+                                />
                             </div>
                             <dl className="grid grid-cols-2 gap-4 border-t border-border pt-4">
                                 {savingsBreakdown.map((stat) => (
@@ -330,7 +338,7 @@ export default function Dashboard({
                                     percent={fund.percent}
                                     label="Emergency fund progress"
                                 />
-                                <div className="min-w-0">
+                                <div className="min-w-0 flex-1">
                                     <p
                                         data-test="dashboard-fund"
                                         className="text-2xl font-semibold tracking-tight tabular-nums"
@@ -343,6 +351,7 @@ export default function Dashboard({
                                             : 'not sized yet'}
                                     </p>
                                 </div>
+                                <PixelArt sprite="umbrella" size={80} />
                             </div>
                             <p
                                 data-test="dashboard-fund-note"
@@ -365,15 +374,22 @@ export default function Dashboard({
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">
-                            <div>
-                                <p className="text-3xl font-semibold tracking-tight tabular-nums">
-                                    {formatPeso(outstandingDebt)}
-                                </p>
-                                <p className="mt-1 text-sm text-muted-foreground">
-                                    {outstandingDebt === 0
-                                        ? 'Nothing owed'
-                                        : 'Remaining balance'}
-                                </p>
+                            <div className="flex items-start justify-between gap-4">
+                                <div>
+                                    <p className="text-3xl font-semibold tracking-tight tabular-nums">
+                                        {formatPeso(outstandingDebt)}
+                                    </p>
+                                    <p className="mt-1 text-sm text-muted-foreground">
+                                        {outstandingDebt === 0
+                                            ? 'Nothing owed'
+                                            : 'Remaining balance'}
+                                    </p>
+                                </div>
+                                <PixelArt
+                                    sprite="mountain"
+                                    size={80}
+                                    className="-my-6"
+                                />
                             </div>
                             <div className="border-t border-border pt-4">
                                 <p className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -401,14 +417,15 @@ export default function Dashboard({
                     </Card>
                 </div>
 
-                <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+                {/*
+                 * Both cards stretch to the taller one, and the chart grows to
+                 * fill whatever height that leaves — no ragged bottom edge.
+                 */}
+                <div className="grid gap-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
                     <Card>
                         <CardHeader className="flex flex-row items-center justify-between gap-4">
                             <CardTitle className="flex items-center gap-2 text-base">
-                                <ChartColumn
-                                    aria-hidden
-                                    className="size-4 text-muted-foreground"
-                                />
+                                <PixelArt sprite="chart" size={24} />
                                 Monthly savings
                             </CardTitle>
                             <Button variant="ghost" size="sm" asChild>
@@ -417,7 +434,7 @@ export default function Dashboard({
                                 </Link>
                             </Button>
                         </CardHeader>
-                        <CardContent>
+                        <CardContent className="flex-1">
                             {chartData.length > 0 ? (
                                 <SavingsChart
                                     data={chartData}
@@ -444,10 +461,7 @@ export default function Dashboard({
                     <Card>
                         <CardHeader className="flex flex-row items-center justify-between gap-4">
                             <CardTitle className="flex items-center gap-2 text-base">
-                                <Activity
-                                    aria-hidden
-                                    className="size-4 text-muted-foreground"
-                                />
+                                <PixelArt sprite="receipt" size={24} />
                                 Recent activity
                             </CardTitle>
                             <Button variant="ghost" size="sm" asChild>

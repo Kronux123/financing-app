@@ -221,7 +221,17 @@ export function PaycheckCard({
     const percent = Math.round(share * 100);
 
     return (
-        <Card data-test={`paycheck-${paycheck.id}`} className="gap-5">
+        /*
+         * A subgrid of the paycheck grid on the plan page: one row for the
+         * header, then one per group. Both paychecks share those rows, so
+         * Allowance and Savings sit level across the two cards however many
+         * payables — or debt details — either one carries.
+         */
+        <Card
+            data-test={`paycheck-${paycheck.id}`}
+            className="grid grid-rows-subgrid gap-6"
+            style={{ gridRow: `span ${plan.groups.length + 1}` }}
+        >
             <CardHeader className="gap-4">
                 <div className="flex items-end justify-between gap-4">
                     <div className="min-w-0">
@@ -282,244 +292,163 @@ export function PaycheckCard({
                 />
             </CardHeader>
 
-            <CardContent className="border-t border-border pt-5">
-                <div className="space-y-6">
-                    {plan.groups.map((group) => {
-                        const funded = itemsFor(group, paycheck.id);
-                        const items = funded.filter(
-                            (item) => !isRemainderItem(item),
-                        );
-                        const remainder = funded.find(isRemainderItem);
+            <CardContent
+                className="grid grid-rows-subgrid border-t border-border pt-5"
+                style={{ gridRow: `span ${plan.groups.length}` }}
+            >
+                {plan.groups.map((group) => {
+                    const funded = itemsFor(group, paycheck.id);
+                    const items = funded.filter(
+                        (item) => !isRemainderItem(item),
+                    );
+                    const remainder = funded.find(isRemainderItem);
 
-                        if (isSingleAmountGroup(group)) {
-                            return (
-                                <div key={group.id} className="space-y-2">
-                                    <div className="flex items-center justify-between gap-2">
-                                        <Label
-                                            htmlFor={`amount-${group.id}-${paycheck.id}`}
-                                            className="text-sm font-medium"
-                                        >
-                                            {group.name}
-                                        </Label>
-                                        <AmountInput
-                                            id={`amount-${group.id}-${paycheck.id}`}
-                                            data-test={`amount-${group.id}-${paycheck.id}`}
-                                            value={enteredTotalFor(
-                                                group,
+                    if (isSingleAmountGroup(group)) {
+                        return (
+                            <div key={group.id} className="space-y-2">
+                                <div className="flex items-center justify-between gap-2">
+                                    <Label
+                                        htmlFor={`amount-${group.id}-${paycheck.id}`}
+                                        className="text-sm font-medium"
+                                    >
+                                        {group.name}
+                                    </Label>
+                                    <AmountInput
+                                        id={`amount-${group.id}-${paycheck.id}`}
+                                        data-test={`amount-${group.id}-${paycheck.id}`}
+                                        value={enteredTotalFor(
+                                            group,
+                                            paycheck.id,
+                                        )}
+                                        onValueChange={(amount) =>
+                                            onGroupAmountChange(
+                                                group.id,
                                                 paycheck.id,
-                                            )}
-                                            onValueChange={(amount) =>
-                                                onGroupAmountChange(
+                                                amount,
+                                            )
+                                        }
+                                        className="w-32 shrink-0"
+                                    />
+                                </div>
+
+                                {remainder && (
+                                    <RemainderRow
+                                        paycheckId={paycheck.id}
+                                        item={remainder}
+                                    />
+                                )}
+
+                                {group.id === savingsGroupId && (
+                                    <SweepToggle
+                                        paycheckId={paycheck.id}
+                                        savesRemainder={savesRemainder}
+                                        onChange={onSavesRemainderChange}
+                                    />
+                                )}
+                            </div>
+                        );
+                    }
+
+                    return (
+                        <div key={group.id} className="space-y-3">
+                            <div className="flex items-baseline justify-between gap-2">
+                                <h3 className="text-sm font-semibold">
+                                    {group.name}
+                                </h3>
+                                <p className="text-sm font-semibold tabular-nums">
+                                    {formatPeso(groupTotal(group, paycheck.id))}
+                                </p>
+                            </div>
+
+                            {/*
+                             * Two tiers per payable. What it is and what it
+                             * costs lead, on a line of their own so the
+                             * amounts align down the list; the end date, the
+                             * debt tick and where it is funded from are
+                             * details, and read as such. Six controls on one
+                             * line was unreadable in a half-width card.
+                             */}
+                            {items.map((item, index) => (
+                                <div
+                                    key={item.id}
+                                    className="space-y-1.5 border-b border-border/60 pb-3 last:border-0 last:pb-0"
+                                >
+                                    <div className="flex items-center gap-2">
+                                        <Input
+                                            aria-label={`${group.name} expense name`}
+                                            data-test={`item-name-${group.id}-${paycheck.id}-${index}`}
+                                            placeholder="Expense"
+                                            value={item.name}
+                                            onChange={(event) =>
+                                                onItemChange(
                                                     group.id,
-                                                    paycheck.id,
-                                                    amount,
+                                                    item.id,
+                                                    {
+                                                        name: event.target
+                                                            .value,
+                                                    },
                                                 )
                                             }
-                                            className="w-32 shrink-0"
+                                            className="h-9 min-w-0 flex-1"
                                         />
+                                        <AmountInput
+                                            label={`${item.name || 'Expense'} amount`}
+                                            data-test={`item-amount-${group.id}-${paycheck.id}-${index}`}
+                                            value={item.amount}
+                                            onValueChange={(amount) =>
+                                                onItemChange(
+                                                    group.id,
+                                                    item.id,
+                                                    {
+                                                        amount,
+                                                    },
+                                                )
+                                            }
+                                            className="w-28 shrink-0"
+                                        />
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="icon"
+                                            className="size-9 shrink-0"
+                                            data-test={`remove-${group.id}-${paycheck.id}-${index}`}
+                                            aria-label={`Remove ${item.name || 'this expense'}`}
+                                            onClick={() =>
+                                                onItemRemove(group.id, item.id)
+                                            }
+                                        >
+                                            <X aria-hidden className="size-4" />
+                                        </Button>
                                     </div>
 
-                                    {remainder && (
-                                        <RemainderRow
-                                            paycheckId={paycheck.id}
-                                            item={remainder}
-                                        />
-                                    )}
-
-                                    {group.id === savingsGroupId && (
-                                        <SweepToggle
-                                            paycheckId={paycheck.id}
-                                            savesRemainder={savesRemainder}
-                                            onChange={onSavesRemainderChange}
-                                        />
-                                    )}
-                                </div>
-                            );
-                        }
-
-                        return (
-                            <div key={group.id} className="space-y-3">
-                                <div className="flex items-baseline justify-between gap-2">
-                                    <h3 className="text-sm font-semibold">
-                                        {group.name}
-                                    </h3>
-                                    <p className="text-sm font-semibold tabular-nums">
-                                        {formatPeso(
-                                            groupTotal(group, paycheck.id),
-                                        )}
-                                    </p>
-                                </div>
-
-                                {/*
-                                 * Two tiers per payable. What it is and what it
-                                 * costs lead, on a line of their own so the
-                                 * amounts align down the list; the end date, the
-                                 * debt tick and where it is funded from are
-                                 * details, and read as such. Six controls on one
-                                 * line was unreadable in a half-width card.
-                                 */}
-                                {items.map((item, index) => (
-                                    <div
-                                        key={item.id}
-                                        className="space-y-1.5 border-b border-border/60 pb-3 last:border-0 last:pb-0"
-                                    >
-                                        <div className="flex items-center gap-2">
-                                            <Input
-                                                aria-label={`${group.name} expense name`}
-                                                data-test={`item-name-${group.id}-${paycheck.id}-${index}`}
-                                                placeholder="Expense"
-                                                value={item.name}
-                                                onChange={(event) =>
-                                                    onItemChange(
-                                                        group.id,
-                                                        item.id,
-                                                        {
-                                                            name: event.target
-                                                                .value,
-                                                        },
-                                                    )
-                                                }
-                                                className="h-9 min-w-0 flex-1"
-                                            />
-                                            <AmountInput
-                                                label={`${item.name || 'Expense'} amount`}
-                                                data-test={`item-amount-${group.id}-${paycheck.id}-${index}`}
-                                                value={item.amount}
-                                                onValueChange={(amount) =>
-                                                    onItemChange(
-                                                        group.id,
-                                                        item.id,
-                                                        {
-                                                            amount,
-                                                        },
-                                                    )
-                                                }
-                                                className="w-28 shrink-0"
-                                            />
-                                            <Button
-                                                type="button"
-                                                variant="ghost"
-                                                size="icon"
-                                                className="size-9 shrink-0"
-                                                data-test={`remove-${group.id}-${paycheck.id}-${index}`}
-                                                aria-label={`Remove ${item.name || 'this expense'}`}
-                                                onClick={() =>
-                                                    onItemRemove(
-                                                        group.id,
-                                                        item.id,
-                                                    )
-                                                }
-                                            >
-                                                <X
-                                                    aria-hidden
-                                                    className="size-4"
-                                                />
-                                            </Button>
-                                        </div>
-
-                                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-                                            {/*
-                                             * Start before end, in the order the
-                                             * debt ran. The start is optional and
-                                             * only useful on a debt — it is what
-                                             * turns "what is left" into "how far
-                                             * through you are" — so it stays off
-                                             * every other payable's row.
-                                             */}
-                                            {item.isDebt && (
-                                                <div className="flex items-center gap-1.5">
-                                                    <span
-                                                        aria-hidden
-                                                        className="text-sm text-muted-foreground"
-                                                    >
-                                                        Started
-                                                    </span>
-                                                    <Input
-                                                        type="date"
-                                                        aria-label={`${item.name || 'Expense'} started on, optional`}
-                                                        data-test={`item-started-${group.id}-${paycheck.id}-${index}`}
-                                                        value={
-                                                            item.startedOn ?? ''
-                                                        }
-                                                        onChange={(event) =>
-                                                            onItemChange(
-                                                                group.id,
-                                                                item.id,
-                                                                {
-                                                                    startedOn:
-                                                                        event
-                                                                            .target
-                                                                            .value ||
-                                                                        undefined,
-                                                                },
-                                                            )
-                                                        }
-                                                        className="h-8 w-40 text-sm [color-scheme:light] dark:[color-scheme:dark]"
-                                                    />
-                                                    <Button
-                                                        type="button"
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        data-test={`item-started-today-${group.id}-${paycheck.id}-${index}`}
-                                                        className="h-7 px-2 text-sm text-foreground/70"
-                                                        onClick={() =>
-                                                            onItemChange(
-                                                                group.id,
-                                                                item.id,
-                                                                {
-                                                                    startedOn:
-                                                                        todayValue(
-                                                                            today,
-                                                                        ),
-                                                                },
-                                                            )
-                                                        }
-                                                    >
-                                                        Today
-                                                    </Button>
-                                                </div>
-                                            )}
-
+                                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+                                        {/*
+                                         * Start before end, in the order the
+                                         * debt ran. The start is optional and
+                                         * only useful on a debt — it is what
+                                         * turns "what is left" into "how far
+                                         * through you are" — so it stays off
+                                         * every other payable's row.
+                                         */}
+                                        {item.isDebt && (
                                             <div className="flex items-center gap-1.5">
-                                                {/*
-                                                 * Hidden from assistive tech so
-                                                 * the input keeps its fuller
-                                                 * name — "Rent ends on" reads
-                                                 * better out of context than
-                                                 * "Ends" repeated per row. The
-                                                 * asterisk goes with it; the
-                                                 * input carries aria-required.
-                                                 */}
                                                 <span
                                                     aria-hidden
                                                     className="text-sm text-muted-foreground"
                                                 >
-                                                    Ends
-                                                    {item.isDebt && (
-                                                        <span className="text-destructive">
-                                                            {' '}
-                                                            *
-                                                        </span>
-                                                    )}
+                                                    Started
                                                 </span>
                                                 <Input
                                                     type="date"
-                                                    aria-label={
-                                                        item.isDebt
-                                                            ? `${item.name || 'Expense'} ends on, required for a debt`
-                                                            : `${item.name || 'Expense'} ends on, optional`
-                                                    }
-                                                    aria-required={
-                                                        item.isDebt === true
-                                                    }
-                                                    data-test={`item-ends-${group.id}-${paycheck.id}-${index}`}
-                                                    value={item.endsOn ?? ''}
+                                                    aria-label={`${item.name || 'Expense'} started on, optional`}
+                                                    data-test={`item-started-${group.id}-${paycheck.id}-${index}`}
+                                                    value={item.startedOn ?? ''}
                                                     onChange={(event) =>
                                                         onItemChange(
                                                             group.id,
                                                             item.id,
                                                             {
-                                                                endsOn:
+                                                                startedOn:
                                                                     event.target
                                                                         .value ||
                                                                     undefined,
@@ -528,100 +457,166 @@ export function PaycheckCard({
                                                     }
                                                     className="h-8 w-40 text-sm [color-scheme:light] dark:[color-scheme:dark]"
                                                 />
-                                            </div>
-
-                                            <div className="flex items-center gap-1.5">
-                                                <Checkbox
-                                                    id={`is-debt-${group.id}-${paycheck.id}-${index}`}
-                                                    data-test={`item-is-debt-${group.id}-${paycheck.id}-${index}`}
-                                                    checked={
-                                                        item.isDebt === true
-                                                    }
-                                                    onCheckedChange={(state) =>
-                                                        onItemChange(
-                                                            group.id,
-                                                            item.id,
-                                                            {
-                                                                isDebt:
-                                                                    state ===
-                                                                    true
-                                                                        ? true
-                                                                        : undefined,
-                                                            },
-                                                        )
-                                                    }
-                                                />
-                                                <Label
-                                                    htmlFor={`is-debt-${group.id}-${paycheck.id}-${index}`}
-                                                    className="text-sm font-normal text-muted-foreground"
-                                                >
-                                                    Debt
-                                                </Label>
-                                            </div>
-
-                                            {otherPaycheck && (
                                                 <Button
                                                     type="button"
                                                     variant="ghost"
-                                                    size="icon"
-                                                    className="ml-auto size-7 shrink-0"
-                                                    data-test={`move-${group.id}-${paycheck.id}-${index}`}
-                                                    aria-label={`Move ${item.name || 'this expense'} to ${otherPaycheck.label}`}
+                                                    size="sm"
+                                                    data-test={`item-started-today-${group.id}-${paycheck.id}-${index}`}
+                                                    className="h-7 px-2 text-sm text-foreground/70"
                                                     onClick={() =>
                                                         onItemChange(
                                                             group.id,
                                                             item.id,
                                                             {
-                                                                paycheckId:
-                                                                    otherPaycheck.id,
+                                                                startedOn:
+                                                                    todayValue(
+                                                                        today,
+                                                                    ),
                                                             },
                                                         )
                                                     }
                                                 >
-                                                    <ArrowLeftRight
-                                                        aria-hidden
-                                                        className="size-3.5"
-                                                    />
+                                                    Today
                                                 </Button>
-                                            )}
+                                            </div>
+                                        )}
+
+                                        <div className="flex items-center gap-1.5">
+                                            {/*
+                                             * Hidden from assistive tech so
+                                             * the input keeps its fuller
+                                             * name — "Rent ends on" reads
+                                             * better out of context than
+                                             * "Ends" repeated per row. The
+                                             * asterisk goes with it; the
+                                             * input carries aria-required.
+                                             */}
+                                            <span
+                                                aria-hidden
+                                                className="text-sm text-muted-foreground"
+                                            >
+                                                Ends
+                                                {item.isDebt && (
+                                                    <span className="text-destructive">
+                                                        {' '}
+                                                        *
+                                                    </span>
+                                                )}
+                                            </span>
+                                            <Input
+                                                type="date"
+                                                aria-label={
+                                                    item.isDebt
+                                                        ? `${item.name || 'Expense'} ends on, required for a debt`
+                                                        : `${item.name || 'Expense'} ends on, optional`
+                                                }
+                                                aria-required={
+                                                    item.isDebt === true
+                                                }
+                                                data-test={`item-ends-${group.id}-${paycheck.id}-${index}`}
+                                                value={item.endsOn ?? ''}
+                                                onChange={(event) =>
+                                                    onItemChange(
+                                                        group.id,
+                                                        item.id,
+                                                        {
+                                                            endsOn:
+                                                                event.target
+                                                                    .value ||
+                                                                undefined,
+                                                        },
+                                                    )
+                                                }
+                                                className="h-8 w-40 text-sm [color-scheme:light] dark:[color-scheme:dark]"
+                                            />
                                         </div>
 
-                                        {item.isDebt && (
-                                            <p
-                                                data-test={`item-owed-${group.id}-${paycheck.id}-${index}`}
-                                                className="text-sm text-muted-foreground tabular-nums"
+                                        <div className="flex items-center gap-1.5">
+                                            <Checkbox
+                                                id={`is-debt-${group.id}-${paycheck.id}-${index}`}
+                                                data-test={`item-is-debt-${group.id}-${paycheck.id}-${index}`}
+                                                checked={item.isDebt === true}
+                                                onCheckedChange={(state) =>
+                                                    onItemChange(
+                                                        group.id,
+                                                        item.id,
+                                                        {
+                                                            isDebt:
+                                                                state === true
+                                                                    ? true
+                                                                    : undefined,
+                                                        },
+                                                    )
+                                                }
+                                            />
+                                            <Label
+                                                htmlFor={`is-debt-${group.id}-${paycheck.id}-${index}`}
+                                                className="text-sm font-normal text-muted-foreground"
                                             >
-                                                {debtNote(item, today)}
-                                            </p>
+                                                Debt
+                                            </Label>
+                                        </div>
+
+                                        {otherPaycheck && (
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="icon"
+                                                className="ml-auto size-7 shrink-0"
+                                                data-test={`move-${group.id}-${paycheck.id}-${index}`}
+                                                aria-label={`Move ${item.name || 'this expense'} to ${otherPaycheck.label}`}
+                                                onClick={() =>
+                                                    onItemChange(
+                                                        group.id,
+                                                        item.id,
+                                                        {
+                                                            paycheckId:
+                                                                otherPaycheck.id,
+                                                        },
+                                                    )
+                                                }
+                                            >
+                                                <ArrowLeftRight
+                                                    aria-hidden
+                                                    className="size-3.5"
+                                                />
+                                            </Button>
                                         )}
                                     </div>
-                                ))}
 
-                                <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="sm"
-                                    data-test={`add-${group.id}-${paycheck.id}`}
-                                    // Muted text drops to 4.34:1 once the ghost
-                                    // hover background lands under it.
-                                    className="h-8 w-full justify-start text-foreground/70"
-                                    onClick={() =>
-                                        onItemAdd(group.id, paycheck.id)
-                                    }
-                                >
-                                    <Plus aria-hidden className="size-3.5" />
-                                    Add to {group.name}
-                                </Button>
+                                    {item.isDebt && (
+                                        <p
+                                            data-test={`item-owed-${group.id}-${paycheck.id}-${index}`}
+                                            className="text-sm text-muted-foreground tabular-nums"
+                                        >
+                                            {debtNote(item, today)}
+                                        </p>
+                                    )}
+                                </div>
+                            ))}
 
-                                <p className="text-sm text-muted-foreground">
-                                    Give a payable that stops, like an
-                                    installment, its end date. Tick Debt and it
-                                    counts toward what you owe.
-                                </p>
-                            </div>
-                        );
-                    })}
-                </div>
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                data-test={`add-${group.id}-${paycheck.id}`}
+                                // Muted text drops to 4.34:1 once the ghost
+                                // hover background lands under it.
+                                className="h-8 w-full justify-start text-foreground/70"
+                                onClick={() => onItemAdd(group.id, paycheck.id)}
+                            >
+                                <Plus aria-hidden className="size-3.5" />
+                                Add to {group.name}
+                            </Button>
+
+                            <p className="text-sm text-muted-foreground">
+                                Give a payable that stops, like an installment,
+                                its end date. Tick Debt and it counts toward
+                                what you owe.
+                            </p>
+                        </div>
+                    );
+                })}
             </CardContent>
         </Card>
     );

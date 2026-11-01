@@ -3,6 +3,7 @@ import { Check, ChevronDown, Plus, X } from 'lucide-react';
 import { useState } from 'react';
 import { EmptyPanel } from '@/components/dashboard/empty-panel';
 import { AmountInput } from '@/components/finance/amount-input';
+import { SpriteTile } from '@/components/pixel-art';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -528,14 +529,17 @@ export default function Payouts() {
 
             <div className="flex w-full flex-col gap-6 p-4 md:p-6">
                 <header className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
-                    <div>
-                        <h1 className="text-2xl font-semibold tracking-tight">
-                            Payouts
-                        </h1>
-                        <p className="mt-1 max-w-md text-sm text-muted-foreground">
-                            Each payday, filled in from your plan. Fix what came
-                            out differently, then finalize it.
-                        </p>
+                    <div className="flex items-center gap-4">
+                        <SpriteTile sprite="moneybag" />
+                        <div>
+                            <h1 className="text-2xl font-semibold tracking-tight">
+                                Payouts
+                            </h1>
+                            <p className="mt-1 max-w-md text-sm text-muted-foreground">
+                                Each payday, filled in from your plan. Fix what
+                                came out differently, then finalize it.
+                            </p>
+                        </div>
                     </div>
 
                     {payouts.length > 0 && (

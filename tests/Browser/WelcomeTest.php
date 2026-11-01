@@ -6,6 +6,8 @@
  * call to action, which is why the signed-in variant is worth its own test.
  */
 
+use App\Actions\Finance\StatutoryDeductions;
+use App\Enums\PayCadence;
 use App\Models\User;
 
 test('the landing page tells a guest what the app is for', function () {
@@ -78,6 +80,59 @@ test('nothing on the landing page points back at the starter kit', function () {
     $page->assertDontSee('Laracasts')
         ->assertDontSee('Deploy now')
         ->assertDontSee("Let's get started");
+});
+
+/*
+ * The figures come from StatutoryDeductions for a ₱40,000 gross. If a rate in
+ * config/payroll.php moves, this fails — rerun the calculation and update the
+ * landing page rather than this test.
+ */
+test('the deductions example matches the real calculation', function () {
+    $breakdown = app(StatutoryDeductions::class)->handle(4_000_000);
+    $paychecks = app(StatutoryDeductions::class)
+        ->paycheckAmounts(PayCadence::SemiMonthly, 4_000_000);
+
+    expect($breakdown)->toMatchArray([
+        'sss' => 175_000,
+        'philhealth' => 100_000,
+        'pagibig' => 20_000,
+        'tax' => 261_840,
+        'takeHome' => 3_443_160,
+    ])->and($paychecks)->toBe(['mid-month' => 1_869_080, 'end-month' => 1_574_080]);
+
+    visit(route('home'))
+        ->assertSee('Start from the figure on your offer letter.')
+        ->assertSee('₱2,618.40')
+        ->assertSee('₱34,431.60')
+        ->assertSee('₱18,690.80')
+        ->assertSee('₱15,740.80');
+});
+
+test('the landing page covers exports, security and common questions', function () {
+    $page = visit(route('home'));
+
+    $page->assertSee('Take it with you. Lock it behind more than a password.')
+        ->assertSee('kept-2026-07.xlsx')
+        ->assertSee('More than a password')
+        ->assertSee('Does it connect to my bank?')
+        ->assertDontSee('Nothing is pulled from a bank')
+        ->click('Does it connect to my bank?')
+        ->assertSee('Nothing is pulled from a bank');
+});
+
+/*
+ * The parallax backdrop is decoration only. It has to stay out of the
+ * accessibility tree and out of the way of clicks on the content above it.
+ */
+test('the parallax backdrop is hidden from assistive tech and from the pointer', function () {
+    $page = visit(route('home'));
+
+    $page->assertPresent('@landing-backdrop')
+        ->assertAttribute('@landing-backdrop', 'aria-hidden', 'true')
+        ->assertScript("getComputedStyle(document.querySelector('[data-test=\"landing-backdrop\"]')).pointerEvents", 'none')
+        ->click('Build your plan')
+        ->assertPathIs('/register')
+        ->assertNoJavaScriptErrors();
 });
 
 test('the landing page has no accessibility issues', function () {

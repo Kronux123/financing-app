@@ -1,7 +1,18 @@
 import { Head, Link, usePage } from '@inertiajs/react';
-import { CalendarDays, Landmark, PiggyBank } from 'lucide-react';
+import {
+    CalendarDays,
+    Check,
+    ChevronDown,
+    FileJson,
+    FileSpreadsheet,
+    History,
+    KeyRound,
+    Landmark,
+    PiggyBank,
+} from 'lucide-react';
 import {
     motion,
+    MotionConfig,
     useMotionValue,
     useReducedMotion,
     useSpring,
@@ -10,9 +21,8 @@ import {
 import type { PointerEvent as ReactPointerEvent } from 'react';
 import { Fragment, useCallback } from 'react';
 import AppLogoIcon from '@/components/app-logo-icon';
-import { PageBackdrop } from '@/components/page-backdrop';
 import { Button } from '@/components/ui/button';
-
+import { LandingBackdrop } from '@/components/welcome/landing-backdrop';
 import {
     CalendarPreview,
     ChartPreview,
@@ -20,8 +30,16 @@ import {
     PayoutPreview,
     PlanPreview,
 } from '@/components/welcome/previews';
+import {
+    CountUp,
+    easeOut,
+    RevealHeading,
+    revealFrom,
+} from '@/components/welcome/reveal';
+
 import { appName } from '@/lib/app';
-import { formatPeso } from '@/lib/currency';
+import { formatPeso, formatPesoExact } from '@/lib/currency';
+import { cn } from '@/lib/utils';
 import { dashboard, login, register } from '@/routes';
 
 /**
@@ -129,7 +147,108 @@ const closingPoints = [
     'Light, dark and system',
 ];
 
-const easeOut = [0.22, 1, 0.36, 1] as const;
+/** Under the hero buttons: the three things a first-time visitor asks first. */
+const heroPoints = [
+    'No bank login — you type it in',
+    'SSS, PhilHealth, Pag-IBIG and tax worked out',
+    'Excel and PDF exports',
+];
+
+/**
+ * A ₱40,000 monthly gross, as `StatutoryDeductions` works it out at the rates in
+ * config/payroll.php. Copied from the real calculation rather than recomputed
+ * here: a second copy of the maths in TypeScript would drift the first time a
+ * rate changed. If the rates move, rerun it and update these.
+ */
+const exampleGross = 40_000;
+
+const exampleDeductions = [
+    { label: 'SSS', amount: 1_750, fill: 'bg-goal-close' },
+    { label: 'PhilHealth', amount: 1_000, fill: 'bg-goal-close/65' },
+    { label: 'Pag-IBIG', amount: 200, fill: 'bg-goal-close/35' },
+    { label: 'Withholding tax', amount: 2_618.4, fill: 'bg-goal-behind' },
+];
+
+const exampleTakeHome = 34_431.6;
+
+/**
+ * Semi-monthly: half the month's tax off each paycheck, and every contribution
+ * off the end of the month — see `paycheckAmounts()`.
+ */
+const examplePaychecks = [
+    { when: 'The 15th', amount: 18_690.8 },
+    { when: 'End of month', amount: 15_740.8 },
+];
+
+const fileSlug = appName.toLowerCase();
+
+const yoursToKeep = [
+    {
+        icon: FileSpreadsheet,
+        title: 'Spreadsheets and PDFs',
+        body: 'Download a month as an Excel sheet or a PDF, or a whole year as one workbook. Files are named by date, so a folder of them sorts itself.',
+        files: [
+            `${fileSlug}-2026-07.xlsx`,
+            `${fileSlug}-2026-07.pdf`,
+            `${fileSlug}-2026.xlsx`,
+        ],
+    },
+    {
+        icon: FileJson,
+        title: 'Your plan as a file',
+        body: 'Export the whole budget plan and import it back — to keep a copy somewhere safe, or to start again from one.',
+        files: [`${fileSlug}-budget-plan-2026-11-01.json`],
+    },
+    {
+        icon: History,
+        title: 'An activity log',
+        body: 'Every peso a payday brought in or paid out, newest first. Anything that was never on the plan is flagged as unplanned.',
+        files: [],
+    },
+    {
+        icon: KeyRound,
+        title: 'More than a password',
+        body: 'Sign in with a passkey, add two-factor codes from an authenticator app, and verify your email before anything opens.',
+        files: [],
+    },
+];
+
+/** The footer's jump links, matched to each section heading's `id`. */
+const footerSections = [
+    { id: 'gross-to-take-home', label: 'Gross to take-home' },
+    { id: 'how-a-month-works', label: 'How a month works' },
+    { id: 'the-record-holds', label: 'Why the record holds' },
+    { id: 'yours-to-keep', label: 'Exports and security' },
+    { id: 'questions', label: 'Questions' },
+];
+
+/** Answered from what the code does, not from what a finance app usually does. */
+const questions = [
+    {
+        question: 'Does it connect to my bank?',
+        answer: 'No. Nothing is pulled from a bank or an e-wallet, and you never hand over a login. You write the plan, and you correct each payday against your payslip.',
+    },
+    {
+        question: 'I am paid once a month. Does it still work?',
+        answer: 'Yes. Choose monthly or semi-monthly pay, and the plan, the paydays and the deductions all follow whichever you pick.',
+    },
+    {
+        question: 'What happens when payday falls on a weekend?',
+        answer: 'It is paid the Friday before, so that is when the record for it opens.',
+    },
+    {
+        question: 'Can I change a month after I have settled it?',
+        answer: 'No, and that is on purpose. A finalized record stops accepting edits, so what February cost stays what February cost — however your plan changes later.',
+    },
+    {
+        question: 'Which deductions does it work out?',
+        answer: 'For a Philippine monthly gross: SSS, PhilHealth and Pag-IBIG contributions, then withholding tax on what is left, each to the centavo the way a payslip shows it.',
+    },
+    {
+        question: 'Can I get my data out?',
+        answer: 'Yes. A month downloads as Excel or PDF, a year as one Excel workbook, and your plan as a file you can import again.',
+    },
+];
 
 /**
  * The load entrance, as props to spread onto a `motion` element.
@@ -152,37 +271,20 @@ const riseAt = (delay: number) => ({
 });
 
 /**
- * The scroll reveal moves but never fades.
+ * Scroll entrances move but never fade — `revealFrom()` in
+ * `components/welcome/reveal.tsx` only accepts transforms. Fading a block that
+ * holds `text-muted-foreground` puts it under the contrast floor for as long as
+ * the animation runs; axe caught it on all six paragraphs of the stages list.
+ * See `.ai/rules/js.md`.
  *
- * Fading a block that holds `text-muted-foreground` puts it under the contrast
- * floor for as long as the animation runs — the token is #737373, 4.6:1 on
- * white, and part-opacity blends it to #898989 at 3.49:1. axe caught it on all
- * six paragraphs of the stages list. Translating alone never touches a computed
- * colour, so this costs nothing in contrast. See `.ai/rules/js.md`.
+ * Each section arrives in its own way, picked to suit what it shows: the
+ * stages tip forward like cards being dealt, the record section strikes the old
+ * rent through and stamps February locked, the exports slide in from either
+ * side. The headings all rise word by word, which is what ties them together.
  */
-const settleIn = {
-    initial: { y: 40 },
-    whileInView: { y: 0 },
-    viewport: { once: true, amount: 0.12 } as const,
-    transition: { duration: 0.8, ease: easeOut },
-};
 
-/**
- * Cards inside a section, arriving one after another as it comes into view.
- * Same no-fade rule as above — the stagger does the work instead, which is why
- * the offsets here are larger than they would be with an opacity ramp to hide
- * behind.
- */
-const revealAt = (index: number) => ({
-    initial: { y: 34 },
-    whileInView: { y: 0 },
-    viewport: { once: true, amount: 0.1 } as const,
-    transition: {
-        duration: 0.7,
-        ease: easeOut,
-        delay: 0.08 + index * 0.11,
-    },
-});
+/** The perspective the 3D entrances (`rotateX`, `rotateY`) are seen through. */
+const revealDepth = { perspective: 1200 } as const;
 
 /** Degrees of tilt at the very corner of the card. */
 const maxTilt = 6;
@@ -263,16 +365,73 @@ type RevealSectionProps = {
     labelledBy?: string;
 };
 
-/** A full-height section that settles into place the first time you reach it. */
+/**
+ * A full-height section. It does not move itself — its intro and its content
+ * each carry their own entrance, and a moving parent would add its offset to
+ * every one of them.
+ */
 function RevealSection({ children, labelledBy }: RevealSectionProps) {
     return (
-        <motion.section
+        <section
             aria-labelledby={labelledBy}
-            {...settleIn}
             className="flex min-h-svh flex-col justify-center py-20 sm:py-28"
         >
             {children}
-        </motion.section>
+        </section>
+    );
+}
+
+type SectionIntroProps = {
+    eyebrow: string;
+    title: string;
+    /** Becomes the heading's `id`, for `aria-labelledby` and the footer links. */
+    id?: string;
+    body?: string[];
+    /** Extra classes for the heading, such as a width cap. */
+    titleClassName?: string;
+};
+
+/**
+ * The eyebrow, heading and lead paragraphs every section opens with. The
+ * eyebrow rises first, the heading follows word by word, then the paragraphs.
+ */
+function SectionIntro({
+    eyebrow,
+    title,
+    id,
+    body = [],
+    titleClassName,
+}: SectionIntroProps) {
+    return (
+        <>
+            <motion.p
+                {...revealFrom({ y: 20 }, 0, 0.6)}
+                className="text-xs font-medium tracking-[0.2em] text-muted-foreground uppercase"
+            >
+                {eyebrow}
+            </motion.p>
+            <RevealHeading
+                id={id}
+                className={cn(
+                    'mt-4 text-3xl font-semibold tracking-tight text-balance sm:text-4xl',
+                    titleClassName,
+                )}
+            >
+                {title}
+            </RevealHeading>
+            {body.map((paragraph, index) => (
+                <motion.p
+                    key={paragraph}
+                    {...revealFrom({ y: 28 }, 0.25 + index * 0.1)}
+                    className={cn(
+                        'max-w-xl text-pretty text-muted-foreground',
+                        index === 0 ? 'mt-5' : 'mt-4',
+                    )}
+                >
+                    {paragraph}
+                </motion.p>
+            ))}
+        </>
     );
 }
 
@@ -316,12 +475,12 @@ export default function Welcome() {
     }, [pointerX, pointerY]);
 
     return (
-        <>
+        <MotionConfig reducedMotion="user">
             <Head
                 title={`${appName} — plan what comes in, record what goes out`}
             />
 
-            <PageBackdrop variant="landing" />
+            <LandingBackdrop />
 
             <div className="relative z-10 flex min-h-screen flex-col text-foreground">
                 <header className="mx-auto flex w-full max-w-[96rem] items-center justify-between gap-4 px-5 py-6 sm:px-8">
@@ -401,6 +560,26 @@ export default function Welcome() {
                                     </Button>
                                 )}
                             </motion.div>
+
+                            <motion.ul
+                                {...riseAt(0.31)}
+                                className="mt-10 flex flex-col gap-2.5 text-sm"
+                            >
+                                {heroPoints.map((point) => (
+                                    <li
+                                        key={point}
+                                        className="flex items-center gap-2.5"
+                                    >
+                                        <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-jade/15">
+                                            <Check
+                                                aria-hidden
+                                                className="size-3 text-jade"
+                                            />
+                                        </span>
+                                        {point}
+                                    </li>
+                                ))}
+                            </motion.ul>
                         </div>
 
                         {/*
@@ -476,28 +655,169 @@ export default function Welcome() {
                         </motion.div>
                     </section>
 
-                    <RevealSection labelledBy="how-a-month-works">
-                        <p className="text-xs font-medium tracking-[0.2em] text-muted-foreground uppercase">
-                            The shape of a month
-                        </p>
-                        <h2
-                            id="how-a-month-works"
-                            className="mt-4 max-w-3xl text-3xl font-semibold tracking-tight text-balance sm:text-4xl"
-                        >
-                            A plan you write once, and a record that writes
-                            itself.
-                        </h2>
-                        <p className="mt-5 max-w-2xl text-pretty text-muted-foreground">
-                            Three states, in the order you meet them. Two of
-                            them are the words the payouts page uses — these are
-                            the screens, shrunk down.
-                        </p>
+                    <RevealSection labelledBy="gross-to-take-home">
+                        <div className="grid gap-12 lg:grid-cols-[1fr_1.05fr] lg:items-center lg:gap-16">
+                            <div>
+                                <SectionIntro
+                                    eyebrow="Before the plan"
+                                    title="Start from the figure on your offer letter."
+                                    id="gross-to-take-home"
+                                    body={[
+                                        'Type your monthly gross and the planner works out what your paychecks will actually be: SSS, PhilHealth and Pag-IBIG first, then withholding tax on what is left — to the centavo, the way a payslip shows it.',
+                                        'Paid twice a month, the tax is split across both paychecks and the contributions all come off the end of the month, so the 15th is the bigger one.',
+                                    ]}
+                                />
+                            </div>
 
-                        <ol className="mt-14 grid gap-5 lg:grid-cols-3">
+                            {/*
+                             * The card swings in from the right, the bar grows
+                             * with scaleX, the rows follow it in, and the
+                             * take-home counts up — all transforms or text, so
+                             * nothing fades under the contrast floor.
+                             */}
+                            <motion.div
+                                {...revealFrom({ x: 90, rotateY: -14 }, 0.1, 1)}
+                                style={{ transformPerspective: 1200 }}
+                                className="overflow-hidden rounded-xl border border-border bg-card"
+                            >
+                                <div className="flex items-center justify-between gap-3 border-b border-border px-5 py-3.5 sm:px-6">
+                                    <p className="text-sm font-medium">
+                                        Example deductions
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                        Monthly gross{' '}
+                                        <span className="font-medium text-foreground tabular-nums">
+                                            {formatPeso(exampleGross)}
+                                        </span>
+                                    </p>
+                                </div>
+
+                                <div className="flex flex-col gap-5 p-5 sm:p-6">
+                                    <motion.div
+                                        aria-hidden
+                                        initial={{ scaleX: 0 }}
+                                        whileInView={{ scaleX: 1 }}
+                                        viewport={{ once: true, amount: 0.6 }}
+                                        transition={{
+                                            duration: 1.1,
+                                            ease: easeOut,
+                                            delay: 0.25,
+                                        }}
+                                        className="flex h-3 origin-left overflow-hidden rounded-full bg-muted"
+                                    >
+                                        <span
+                                            className="bg-goal-met"
+                                            style={{
+                                                width: `${(exampleTakeHome / exampleGross) * 100}%`,
+                                            }}
+                                        />
+                                        {exampleDeductions.map((deduction) => (
+                                            <span
+                                                key={deduction.label}
+                                                className={deduction.fill}
+                                                style={{
+                                                    width: `${(deduction.amount / exampleGross) * 100}%`,
+                                                }}
+                                            />
+                                        ))}
+                                    </motion.div>
+
+                                    <div className="flex flex-col gap-2 text-sm">
+                                        {exampleDeductions.map(
+                                            (deduction, index) => (
+                                                <motion.div
+                                                    key={deduction.label}
+                                                    {...revealFrom(
+                                                        { x: 48 },
+                                                        0.45 + index * 0.09,
+                                                        0.6,
+                                                    )}
+                                                    className="flex items-baseline justify-between gap-3"
+                                                >
+                                                    <p className="flex items-center gap-2 text-muted-foreground">
+                                                        <span
+                                                            aria-hidden
+                                                            className={`size-2 shrink-0 rounded-full ${deduction.fill}`}
+                                                        />
+                                                        {deduction.label}
+                                                    </p>
+                                                    <p className="tabular-nums">
+                                                        −
+                                                        {formatPesoExact(
+                                                            deduction.amount,
+                                                        )}
+                                                    </p>
+                                                </motion.div>
+                                            ),
+                                        )}
+                                    </div>
+
+                                    <div className="flex items-baseline justify-between gap-3 border-t border-border pt-3">
+                                        <p className="flex items-center gap-2 text-sm">
+                                            <span
+                                                aria-hidden
+                                                className="size-2 shrink-0 rounded-full bg-goal-met"
+                                            />
+                                            Take-home
+                                        </p>
+                                        <p className="text-lg font-semibold">
+                                            <CountUp
+                                                value={exampleTakeHome}
+                                                format={formatPesoExact}
+                                                delay={0.3}
+                                            />
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-2 divide-x divide-border border-t border-border bg-muted/40">
+                                    {examplePaychecks.map((paycheck) => (
+                                        <div
+                                            key={paycheck.when}
+                                            className="px-5 py-4 sm:px-6"
+                                        >
+                                            <p className="text-xs font-medium tracking-[0.14em] text-muted-foreground uppercase">
+                                                {paycheck.when}
+                                            </p>
+                                            <p className="mt-1 font-semibold">
+                                                <CountUp
+                                                    value={paycheck.amount}
+                                                    format={formatPesoExact}
+                                                    delay={0.5}
+                                                />
+                                            </p>
+                                        </div>
+                                    ))}
+                                </div>
+                            </motion.div>
+                        </div>
+                    </RevealSection>
+
+                    <RevealSection labelledBy="how-a-month-works">
+                        <SectionIntro
+                            eyebrow="The shape of a month"
+                            title="A plan you write once, and a record that writes itself."
+                            id="how-a-month-works"
+                            titleClassName="max-w-3xl"
+                            body={[
+                                'Three states, in the order you meet them. Two of them are the words the payouts page uses — these are the screens, shrunk down.',
+                            ]}
+                        />
+
+                        {/* Dealt onto the table: each card tips forward from its top edge. */}
+                        <ol
+                            className="mt-14 grid gap-5 lg:grid-cols-3"
+                            style={revealDepth}
+                        >
                             {monthStages.map((stage, index) => (
                                 <motion.li
                                     key={stage.state}
-                                    {...revealAt(index)}
+                                    {...revealFrom(
+                                        { y: 70, rotateX: 28 },
+                                        0.1 + index * 0.16,
+                                        0.9,
+                                    )}
+                                    style={{ transformOrigin: 'top center' }}
                                     className="flex flex-col gap-5 rounded-xl border border-border bg-card/60 p-5 backdrop-blur-sm sm:p-6"
                                 >
                                     <div className="flex items-center gap-3">
@@ -529,32 +849,31 @@ export default function Welcome() {
                     <RevealSection labelledBy="the-record-holds">
                         <div className="grid gap-12 lg:grid-cols-[1fr_1fr] lg:items-center lg:gap-16">
                             <div>
-                                <p className="text-xs font-medium tracking-[0.2em] text-muted-foreground uppercase">
-                                    Why the ledger is worth keeping
-                                </p>
-                                <h2
+                                <SectionIntro
+                                    eyebrow="Why the ledger is worth keeping"
+                                    title="Raise your rent in March. February still says what February cost."
                                     id="the-record-holds"
-                                    className="mt-4 text-3xl font-semibold tracking-tight text-balance sm:text-4xl"
-                                >
-                                    Raise your rent in March. February still
-                                    says what February cost.
-                                </h2>
-                                <p className="mt-5 max-w-xl text-pretty text-muted-foreground">
-                                    A payday copies your plan; it never points
-                                    at it. Once a record is finalized it stops
-                                    following the plan and stops accepting
-                                    edits, so your ledger keeps saying what
-                                    happened — not what you would plan today.
-                                </p>
+                                    body={[
+                                        'A payday copies your plan; it never points at it. Once a record is finalized it stops following the plan and stops accepting edits, so your ledger keeps saying what happened — not what you would plan today.',
+                                    ]}
+                                />
                             </div>
 
                             {/*
                              * The claim, demonstrated rather than asserted: the
                              * same line in two places, one edited and one not,
                              * with the arrow between them cut.
+                             *
+                             * Played as a short scene: the plan arrives, the
+                             * old rent is struck through and the new one
+                             * lands, the cut arrow opens, then February slides
+                             * in from the other side and is stamped locked.
                              */}
                             <div className="flex flex-col gap-3">
-                                <div className="rounded-xl border border-border bg-card/60 p-5 backdrop-blur-sm">
+                                <motion.div
+                                    {...revealFrom({ x: 70 }, 0.1)}
+                                    className="rounded-xl border border-border bg-card/60 p-5 backdrop-blur-sm"
+                                >
                                     <div className="flex items-center justify-between gap-3">
                                         <p className="text-xs font-medium tracking-[0.14em] text-muted-foreground uppercase">
                                             Your plan, today
@@ -564,40 +883,81 @@ export default function Welcome() {
                                         </span>
                                     </div>
                                     <p className="mt-4 flex items-baseline gap-3">
-                                        <span className="text-lg text-muted-foreground tabular-nums line-through">
+                                        {/*
+                                         * The strike is drawn, not the
+                                         * `line-through` decoration, so it can
+                                         * be pulled across the figure.
+                                         */}
+                                        <span className="relative text-lg text-muted-foreground tabular-nums">
                                             {formatPeso(7_500)}
+                                            <motion.span
+                                                aria-hidden
+                                                {...revealFrom(
+                                                    { scaleX: 0 },
+                                                    0.55,
+                                                    0.45,
+                                                )}
+                                                className="absolute inset-x-0 top-1/2 h-px origin-left bg-current"
+                                            />
                                         </span>
-                                        <span className="text-2xl font-semibold tabular-nums">
+                                        <motion.span
+                                            {...revealFrom(
+                                                { y: 18, scale: 0.7 },
+                                                0.85,
+                                                0.55,
+                                            )}
+                                            className="inline-block text-2xl font-semibold tabular-nums"
+                                        >
                                             {formatPeso(8_200)}
-                                        </span>
+                                        </motion.span>
                                     </p>
                                     <p className="mt-1.5 text-xs text-muted-foreground">
                                         rent, raised in March
                                     </p>
-                                </div>
+                                </motion.div>
 
                                 <div
                                     aria-hidden
                                     className="flex items-center gap-3 px-5 text-xs text-muted-foreground"
                                 >
-                                    <span className="h-4 w-px bg-border" />
-                                    <span className="rounded border border-dashed border-border px-2 py-0.5">
+                                    <motion.span
+                                        {...revealFrom(
+                                            { scaleY: 0 },
+                                            1.05,
+                                            0.4,
+                                        )}
+                                        className="h-4 w-px origin-top bg-border"
+                                    />
+                                    <motion.span
+                                        {...revealFrom({ x: -24 }, 1.15, 0.5)}
+                                        className="rounded border border-dashed border-border px-2 py-0.5"
+                                    >
                                         does not flow through
-                                    </span>
+                                    </motion.span>
                                 </div>
 
-                                <div className="rounded-xl border border-border bg-card/60 p-5 backdrop-blur-sm">
+                                <motion.div
+                                    {...revealFrom({ x: -70 }, 0.35)}
+                                    className="rounded-xl border border-border bg-card/60 p-5 backdrop-blur-sm"
+                                >
                                     <div className="flex items-center justify-between gap-3">
                                         <p className="text-xs font-medium tracking-[0.14em] text-muted-foreground uppercase">
                                             February, finalized
                                         </p>
-                                        <span className="flex items-center gap-1.5 rounded-full bg-goal-met/15 px-2 py-0.5 text-[0.65rem] font-medium">
+                                        <motion.span
+                                            {...revealFrom(
+                                                { scale: 2.2, rotate: -14 },
+                                                1.35,
+                                                0.45,
+                                            )}
+                                            className="flex items-center gap-1.5 rounded-full bg-goal-met/15 px-2 py-0.5 text-[0.65rem] font-medium"
+                                        >
                                             <span
                                                 aria-hidden
                                                 className="size-1.5 rounded-full bg-goal-met"
                                             />
                                             Locked
-                                        </span>
+                                        </motion.span>
                                     </div>
                                     <p className="mt-4 text-2xl font-semibold tabular-nums">
                                         {formatPeso(7_500)}
@@ -605,27 +965,29 @@ export default function Welcome() {
                                     <p className="mt-1.5 text-xs text-muted-foreground">
                                         what February actually cost
                                     </p>
-                                </div>
+                                </motion.div>
                             </div>
                         </div>
                     </RevealSection>
 
                     <RevealSection labelledBy="also-in-here">
-                        <p className="text-xs font-medium tracking-[0.2em] text-muted-foreground uppercase">
-                            Once a month has settled
-                        </p>
-                        <h2
+                        <SectionIntro
+                            eyebrow="Once a month has settled"
+                            title="Everything downstream reads from the record."
                             id="also-in-here"
-                            className="mt-4 max-w-3xl text-3xl font-semibold tracking-tight text-balance sm:text-4xl"
-                        >
-                            Everything downstream reads from the record.
-                        </h2>
+                            titleClassName="max-w-3xl"
+                        />
 
+                        {/* Rising up out of the record, slightly small, and settling to size. */}
                         <div className="mt-14 grid gap-5 lg:grid-cols-3">
                             {alsoInHere.map((feature, index) => (
                                 <motion.div
                                     key={feature.title}
-                                    {...revealAt(index)}
+                                    {...revealFrom(
+                                        { y: 80, scale: 0.88 },
+                                        0.1 + index * 0.14,
+                                        0.9,
+                                    )}
                                     className="flex flex-col gap-5 rounded-xl border border-border bg-card/60 p-5 backdrop-blur-sm sm:p-6"
                                 >
                                     <div className="flex items-center gap-2.5">
@@ -650,9 +1012,124 @@ export default function Welcome() {
                         </div>
                     </RevealSection>
 
+                    <RevealSection labelledBy="yours-to-keep">
+                        <SectionIntro
+                            eyebrow="Your record, your files"
+                            title="Take it with you. Lock it behind more than a password."
+                            id="yours-to-keep"
+                            titleClassName="max-w-3xl"
+                        />
+
+                        {/*
+                         * The left column slides in from the left and the
+                         * right from the right, a row at a time, then each
+                         * file name pops onto its card.
+                         */}
+                        <div className="mt-14 grid gap-5 sm:grid-cols-2">
+                            {yoursToKeep.map((item, index) => (
+                                <motion.div
+                                    key={item.title}
+                                    {...revealFrom(
+                                        { x: index % 2 === 0 ? -80 : 80 },
+                                        0.1 + Math.floor(index / 2) * 0.18,
+                                        0.85,
+                                    )}
+                                    className="flex flex-col gap-4 rounded-xl border border-border bg-card/60 p-5 backdrop-blur-sm sm:p-6"
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-jade/12">
+                                            <item.icon
+                                                aria-hidden
+                                                className="size-4 text-jade"
+                                            />
+                                        </span>
+                                        <h3 className="font-semibold">
+                                            {item.title}
+                                        </h3>
+                                    </div>
+                                    <p className="text-sm text-pretty text-muted-foreground">
+                                        {item.body}
+                                    </p>
+                                    {item.files.length > 0 && (
+                                        <ul className="mt-auto flex flex-wrap gap-2">
+                                            {item.files.map(
+                                                (file, fileIndex) => (
+                                                    <motion.li
+                                                        key={file}
+                                                        {...revealFrom(
+                                                            {
+                                                                scale: 0.4,
+                                                                y: 12,
+                                                            },
+                                                            0.6 +
+                                                                Math.floor(
+                                                                    index / 2,
+                                                                ) *
+                                                                    0.18 +
+                                                                fileIndex * 0.1,
+                                                            0.5,
+                                                        )}
+                                                        className="rounded-md border border-border bg-card px-2 py-1 font-mono text-xs"
+                                                    >
+                                                        {file}
+                                                    </motion.li>
+                                                ),
+                                            )}
+                                        </ul>
+                                    )}
+                                </motion.div>
+                            ))}
+                        </div>
+                    </RevealSection>
+
+                    <RevealSection labelledBy="questions">
+                        <div className="grid gap-12 lg:grid-cols-[1fr_1.6fr] lg:gap-16">
+                            <div>
+                                <SectionIntro
+                                    eyebrow="Before you sign up"
+                                    title="Questions worth asking."
+                                    id="questions"
+                                />
+                            </div>
+
+                            {/*
+                             * Native <details>, so every answer opens with
+                             * the keyboard and is in the page for find-in-page
+                             * and search engines without any script.
+                             */}
+                            <div className="flex flex-col divide-y divide-border border-y border-border">
+                                {questions.map((item, index) => (
+                                    <motion.details
+                                        key={item.question}
+                                        {...revealFrom(
+                                            { x: 60 },
+                                            0.15 + index * 0.07,
+                                            0.7,
+                                        )}
+                                        className="group py-1"
+                                    >
+                                        <summary className="flex cursor-pointer list-none items-center justify-between gap-4 rounded-md py-4 font-medium focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none [&::-webkit-details-marker]:hidden">
+                                            {item.question}
+                                            <ChevronDown
+                                                aria-hidden
+                                                className="size-4 shrink-0 text-muted-foreground transition-transform duration-300 group-open:rotate-180"
+                                            />
+                                        </summary>
+                                        <p className="max-w-2xl pb-5 text-pretty text-muted-foreground">
+                                            {item.answer}
+                                        </p>
+                                    </motion.details>
+                                ))}
+                            </div>
+                        </div>
+                    </RevealSection>
+
                     {!auth.user && (
                         <RevealSection>
-                            <div className="overflow-hidden rounded-2xl border border-border bg-card/50 page-glow backdrop-blur-sm">
+                            <motion.div
+                                {...revealFrom({ scale: 0.86, y: 60 }, 0, 1.1)}
+                                className="overflow-hidden rounded-2xl border border-border bg-card/50 page-glow backdrop-blur-sm"
+                            >
                                 <div className="flex flex-col items-center gap-8 px-6 py-14 text-center sm:px-12 sm:py-20">
                                     {/*
                                      * The closing line is where the name earns
@@ -663,10 +1140,10 @@ export default function Welcome() {
                                     <p className="text-xs font-medium tracking-[0.2em] text-muted-foreground uppercase">
                                         One month is enough to start
                                     </p>
-                                    <h2 className="max-w-3xl text-4xl font-semibold tracking-tight text-balance sm:text-5xl">
+                                    <RevealHeading className="max-w-3xl text-4xl font-semibold tracking-tight text-balance sm:text-5xl">
                                         Keep more of what comes in. Keep the
                                         record of where it went.
-                                    </h2>
+                                    </RevealHeading>
                                     <p className="max-w-xl text-pretty text-muted-foreground">
                                         Set out the paychecks you are expecting
                                         and what each one has to cover. Your
@@ -715,7 +1192,7 @@ export default function Welcome() {
                                         ))}
                                     </ul>
                                 </div>
-                            </div>
+                            </motion.div>
                         </RevealSection>
                     )}
                 </main>
@@ -727,12 +1204,77 @@ export default function Welcome() {
                  * padding on the parent.
                  */}
                 <footer className="mx-auto w-full max-w-[96rem] px-5 sm:px-8">
-                    <p className="border-t border-border py-10 text-sm text-muted-foreground">
-                        {appName} — a personal finance planner for tracking what
-                        comes in and what goes out.
-                    </p>
+                    <div className="flex flex-col gap-10 border-t border-border py-12 sm:flex-row sm:justify-between">
+                        <div className="max-w-sm">
+                            <span className="flex items-center gap-2.5">
+                                <span className="flex size-7 items-center justify-center rounded-md bg-primary text-primary-foreground">
+                                    <AppLogoIcon className="size-3.5 fill-current" />
+                                </span>
+                                <span className="font-semibold tracking-tight">
+                                    {appName}
+                                </span>
+                            </span>
+                            <p className="mt-4 text-sm text-pretty text-muted-foreground">
+                                A personal finance planner for tracking what
+                                comes in and what goes out — built around pesos
+                                and Philippine payroll.
+                            </p>
+                        </div>
+
+                        <div className="flex gap-16 text-sm">
+                            <nav aria-label="On this page">
+                                <p className="font-medium">On this page</p>
+                                <ul className="mt-3 flex flex-col gap-2 text-muted-foreground">
+                                    {footerSections.map((section) => (
+                                        <li key={section.id}>
+                                            <a
+                                                href={`#${section.id}`}
+                                                className="hover:text-foreground"
+                                            >
+                                                {section.label}
+                                            </a>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </nav>
+                            <nav aria-label="Account">
+                                <p className="font-medium">Account</p>
+                                <ul className="mt-3 flex flex-col gap-2 text-muted-foreground">
+                                    {auth.user ? (
+                                        <li>
+                                            <Link
+                                                href={dashboard()}
+                                                className="hover:text-foreground"
+                                            >
+                                                Dashboard
+                                            </Link>
+                                        </li>
+                                    ) : (
+                                        <>
+                                            <li>
+                                                <Link
+                                                    href={login()}
+                                                    className="hover:text-foreground"
+                                                >
+                                                    Log in
+                                                </Link>
+                                            </li>
+                                            <li>
+                                                <Link
+                                                    href={register()}
+                                                    className="hover:text-foreground"
+                                                >
+                                                    Create an account
+                                                </Link>
+                                            </li>
+                                        </>
+                                    )}
+                                </ul>
+                            </nav>
+                        </div>
+                    </div>
                 </footer>
             </div>
-        </>
+        </MotionConfig>
     );
 }

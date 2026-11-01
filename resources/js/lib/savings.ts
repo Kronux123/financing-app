@@ -10,6 +10,26 @@
  * the two differently.
  */
 
+/**
+ * How a month did against the monthly goal, as a share of it: 1 is exactly on
+ * goal. The one copy of the thresholds — the savings calendar and the dashboard
+ * chart both grade with this, so a month can never be "close" on one and
+ * "behind" on the other.
+ */
+export type GoalTier = 'behind' | 'close' | 'met';
+
+export const goalTierFor = (share: number): GoalTier => {
+    if (share >= 1) {
+        return 'met';
+    }
+
+    if (share >= 0.7) {
+        return 'close';
+    }
+
+    return 'behind';
+};
+
 export type SavedMonth = {
     /** `2026-07`. */
     month: string;

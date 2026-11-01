@@ -5,12 +5,15 @@ import {
     TrendingUp,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
+import { PixelArt } from '@/components/pixel-art';
 import { Button } from '@/components/ui/button';
 import {
     Tooltip,
     TooltipContent,
     TooltipTrigger,
 } from '@/components/ui/tooltip';
+import type { GoalTier } from '@/lib/savings';
+import { goalTierFor } from '@/lib/savings';
 import { cn } from '@/lib/utils';
 
 const monthLabels = [
@@ -92,17 +95,9 @@ const tiers: Tier[] = [
     },
 ];
 
-const tierFor = (share: number): Tier => {
-    if (share >= 1) {
-        return tiers[2];
-    }
+const tierIndex: Record<GoalTier, number> = { behind: 0, close: 1, met: 2 };
 
-    if (share >= 0.7) {
-        return tiers[1];
-    }
-
-    return tiers[0];
-};
+const tierFor = (share: number): Tier => tiers[tierIndex[goalTierFor(share)]];
 
 type MonthExports = {
     sheet: string;
@@ -184,6 +179,39 @@ function MonthHeading({
     );
 }
 
+type EmptyState = 'unsettled' | 'in-progress' | 'upcoming';
+
+/**
+ * A month with no figure is one of three things, and "No data" said none of
+ * them. A past month had paydays nobody settled; the current month is still
+ * running; a future month has not happened. Only the first is a gap worth
+ * acting on, so it is the only one that keeps the solid dashed card.
+ *
+ * Without `currentMonth` (a past year), every empty month is in the past.
+ */
+const emptyStateFor = (index: number, currentMonth?: number): EmptyState => {
+    if (currentMonth === undefined || index < currentMonth) {
+        return 'unsettled';
+    }
+
+    return index === currentMonth ? 'in-progress' : 'upcoming';
+};
+
+const emptyCopy: Record<EmptyState, { title: string; note: string }> = {
+    unsettled: {
+        title: 'Nothing settled',
+        note: 'Finalize its paydays to fill this in.',
+    },
+    'in-progress': {
+        title: 'In progress',
+        note: 'Fills in once its paydays are settled.',
+    },
+    upcoming: {
+        title: 'Upcoming',
+        note: 'Not here yet.',
+    },
+};
+
 type SavingsCalendarProps = {
     /** Twelve entries, January first. `null` means no data recorded yet. */
     months: (number | null)[];
@@ -242,7 +270,7 @@ export function SavingsCalendar({
                 ))}
                 <li className="flex items-center gap-1.5 rounded-full border border-dashed border-border px-2.5 py-1">
                     <span className="size-2 rounded-full border border-dashed border-border" />
-                    No data
+                    Not settled
                 </li>
             </ul>
 
@@ -252,26 +280,38 @@ export function SavingsCalendar({
                     const isCurrent = index === currentMonth;
 
                     if (amount === null) {
+                        const emptyState = emptyStateFor(index, currentMonth);
+
                         return (
                             <li
                                 key={`${label}-empty`}
+                                data-test={`month-${index + 1}-${emptyState}`}
                                 className={cn(
-                                    'flex flex-col rounded-xl border border-dashed border-border bg-muted/30 p-4',
-                                    isCurrent && 'ring-2 ring-ring/40',
+                                    'flex flex-col rounded-xl border border-dashed p-4',
+                                    emptyState === 'upcoming'
+                                        ? 'border-border/50 bg-transparent'
+                                        : 'border-border bg-muted/30',
+                                    isCurrent &&
+                                        'border-solid border-jade/40 bg-jade/5 ring-2 ring-ring/30',
                                 )}
                             >
-                                <div className="text-muted-foreground">
-                                    <MonthHeading
-                                        label={label}
-                                        isCurrent={isCurrent}
-                                    />
+                                <div className="flex items-start justify-between gap-2">
+                                    <div className="text-muted-foreground">
+                                        <MonthHeading
+                                            label={label}
+                                            isCurrent={isCurrent}
+                                        />
+                                    </div>
+                                    {isCurrent && (
+                                        <PixelArt sprite="calendar" size={24} />
+                                    )}
                                 </div>
-                                <p className="mt-3 text-sm text-muted-foreground">
-                                    No data
+                                <p className="mt-3 text-sm font-medium">
+                                    {emptyCopy[emptyState].title}
                                 </p>
-                                <div className="mt-auto pt-6">
-                                    <div className="h-1.5 rounded-full border border-dashed border-border" />
-                                </div>
+                                <p className="mt-0.5 text-xs text-muted-foreground">
+                                    {emptyCopy[emptyState].note}
+                                </p>
                             </li>
                         );
                     }

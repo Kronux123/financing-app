@@ -92,6 +92,28 @@ test('finalizing a payday puts the month on the dashboard', function () {
         ->assertNoJavaScriptErrors();
 });
 
+/*
+ * The chart says in words what its bars add up to, and grades each month on the
+ * same goal scale as the calendar. ₱16,000 against a ₱10,000 goal is one month
+ * of one on goal, and the bar's tooltip says by how much.
+ */
+test('the savings chart sums up the months against the goal', function () {
+    planWithGoal($this->user, 1_000_000);
+    $key = newestPaydayKey();
+
+    $page = visit(route('payouts.index'));
+
+    $page->click("@payout-toggle-{$key}")
+        ->assertSeeIn("@payout-status-{$key}", 'Finalized')
+        ->click('@nav-dashboard')
+        ->assertSee('Saved in 1 month')
+        ->assertSee('Months on goal')
+        ->assertSee('1 of 1')
+        ->assertSee('₱6,000 over goal')
+        ->assertSee('Goal met')
+        ->assertNoJavaScriptErrors();
+});
+
 test('a correction is what the month reports, not the plan', function () {
     planWithPayday($this->user);
     $key = newestPaydayKey();
@@ -130,7 +152,29 @@ test('a settled month lands in the calendar under its own year', function () {
         ->assertMissing('@calendar-empty')
         ->assertSeeIn('@calendar-year', $year)
         ->assertSeeIn('@calendar-total', '₱16,000')
-        ->assertSee('across 1 month')
+        ->assertSee('across 1 settled month')
+        ->assertNoJavaScriptErrors();
+});
+
+/*
+ * The year is measured against the goal only for the months that were actually
+ * settled. One month of ₱16,000 against a ₱10,000 goal is ₱6,000 ahead of a
+ * one-month pace — not ₱104,000 short of a twelve-month one.
+ */
+test('the calendar measures the year against the pace of its settled months', function () {
+    planWithGoal($this->user, 1_000_000);
+    $key = newestPaydayKey();
+
+    $page = visit(route('payouts.index'));
+
+    $page->click("@payout-toggle-{$key}")
+        ->assertSeeIn("@payout-status-{$key}", 'Finalized')
+        ->click('@nav-dashboard')
+        ->click('View all months')
+        ->assertSeeIn('@calendar-pace', '₱6,000')
+        ->assertSeeIn('@calendar-pace', 'ahead of pace')
+        ->assertSee('of the ₱120,000 goal for')
+        ->assertSee('Best month')
         ->assertNoJavaScriptErrors();
 });
 

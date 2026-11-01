@@ -1,6 +1,7 @@
 import { ArrowRight } from 'lucide-react';
 import { AmountInput } from '@/components/finance/amount-input';
 import { StatusMeter } from '@/components/finance/status-meter';
+import { PixelArt } from '@/components/pixel-art';
 import {
     Card,
     CardContent,
@@ -92,7 +93,10 @@ export function SavingsCard({
     return (
         <Card className="gap-5">
             <CardHeader>
-                <CardTitle className="text-base">Savings</CardTitle>
+                <CardTitle className="flex items-center gap-2.5 text-base">
+                    <PixelArt sprite="piggy-bank" size={32} />
+                    Savings
+                </CardTitle>
                 <CardDescription>
                     The emergency fund fills first, then the rest goes to the
                     pot.
