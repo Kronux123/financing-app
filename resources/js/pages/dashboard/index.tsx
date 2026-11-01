@@ -11,6 +11,7 @@ import { DashboardOnboarding } from '@/components/dashboard/dashboard-onboarding
 import { EmptyPanel } from '@/components/dashboard/empty-panel';
 import { FundRing } from '@/components/dashboard/fund-ring';
 import { PayFlow } from '@/components/dashboard/pay-flow';
+import { PendingPaydaysBanner } from '@/components/dashboard/pending-paydays-banner';
 import { SavingsChart } from '@/components/dashboard/savings-chart';
 import { PageHeader } from '@/components/page-header';
 import { PixelArt } from '@/components/pixel-art';
@@ -256,6 +257,8 @@ export default function Dashboard({
 
             <div className="flex w-full flex-col gap-6 p-4 md:p-6">
                 <OverviewHeader />
+
+                <PendingPaydaysBanner />
 
                 <Card className="py-0">
                     <CardContent className="p-6 md:p-8">

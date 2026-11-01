@@ -1,4 +1,4 @@
-import { Link } from '@inertiajs/react';
+import { Link, usePage } from '@inertiajs/react';
 import {
     Activity,
     DollarSign,
@@ -54,6 +54,18 @@ const mainNavItems: NavItem[] = [
 ];
 
 export function AppSidebar() {
+    const { pendingPaydays } = usePage().props;
+
+    /** Payouts carries the count of paydays waiting to be reviewed. */
+    const items = mainNavItems.map((item) =>
+        item.title === 'Payouts'
+            ? {
+                  ...item,
+                  badge: { count: pendingPaydays, label: 'awaiting review' },
+              }
+            : item,
+    );
+
     return (
         /*
          * `floating`, not `inset`. Inset rounds the content pane and leaves the
@@ -77,7 +89,7 @@ export function AppSidebar() {
             </SidebarHeader>
 
             <SidebarContent>
-                <NavMain items={mainNavItems} />
+                <NavMain items={items} />
             </SidebarContent>
 
             <SidebarFooter>

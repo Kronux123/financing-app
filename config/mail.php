@@ -115,4 +115,24 @@ return [
         'name' => env('MAIL_FROM_NAME', env('APP_NAME', 'Laravel')),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Markdown Mail Settings
+    |--------------------------------------------------------------------------
+    |
+    | Every notification email is drawn with the Kept theme in
+    | resources/views/vendor/mail/html/themes/kept.css. Only the header,
+    | layout and message views are overridden there; the rest come from the
+    | framework.
+    |
+    */
+
+    'markdown' => [
+        'theme' => 'kept',
+
+        'paths' => [
+            resource_path('views/vendor/mail'),
+        ],
+    ],
+
 ];

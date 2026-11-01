@@ -22,3 +22,15 @@ Artisan::command('inspire', function () {
 Schedule::command('payouts:open')
     ->dailyAt('01:00')
     ->withoutOverlapping();
+
+/*
+ * After payouts:open, so a payday that opens this morning is reminded about the
+ * same day. 01:15 UTC is 9:15 in Manila: the start of the working day, not the
+ * middle of the night.
+ *
+ * Daily for the same reason as above. Each payday counts its own reminders, so
+ * a missed run is caught up by the next one and a doubled run sends nothing.
+ */
+Schedule::command('payouts:remind')
+    ->dailyAt('01:15')
+    ->withoutOverlapping();

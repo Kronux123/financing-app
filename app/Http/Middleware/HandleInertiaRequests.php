@@ -49,8 +49,25 @@ class HandleInertiaRequests extends Middleware
              * four times.
              */
             'plan' => fn (): ?array => $this->plan($request),
+            /**
+             * Paydays waiting for review: the badge on Payouts and the banner
+             * on the dashboard. Counted, not stored as a notification, so it
+             * can never disagree with the payouts themselves. A closure, so it
+             * is read after OpenDuePayouts has opened anything due on this
+             * request.
+             */
+            'pendingPaydays' => fn (): int => $this->pendingPaydays($request),
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
         ];
+    }
+
+    /**
+     * reorder() drops the relation's newest-first ordering, which Postgres
+     * refuses alongside count(*).
+     */
+    private function pendingPaydays(Request $request): int
+    {
+        return $request->user()?->payouts()->reorder()->pending()->count() ?? 0;
     }
 
     /**

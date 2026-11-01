@@ -2,8 +2,8 @@
 
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Database\Factories\UserFactory;
+use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -17,10 +17,26 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
 
 #[Fillable(['name', 'email', 'password'])]
 #[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
-class User extends Authenticatable implements PasskeyUser
+/**
+ * MustVerifyEmail, because payday reminders only go to verified addresses: a
+ * typo at sign-up is somebody else's inbox. Verifying is what makes an account
+ * reachable at all.
+ */
+class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
 {
     /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable, PasskeyAuthenticatable, TwoFactorAuthenticatable;
+
+    /**
+     * The column defaults, mirrored so a user that has just been created reads
+     * the same as one loaded back from the database. Without it a fresh model
+     * has no `payday_reminders` at all, which reads as off.
+     *
+     * @var array<string, mixed>
+     */
+    protected $attributes = [
+        'payday_reminders' => true,
+    ];
 
     /**
      * Get the attributes that should be cast.
@@ -31,6 +47,7 @@ class User extends Authenticatable implements PasskeyUser
     {
         return [
             'email_verified_at' => 'datetime',
+            'payday_reminders' => 'boolean',
             'password' => 'hashed',
             'two_factor_confirmed_at' => 'datetime',
         ];

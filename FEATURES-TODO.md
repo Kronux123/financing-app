@@ -8,7 +8,14 @@ fresh session can pick it up cold.
 
 ## Worth building
 
-### 1. [ ] Payday reminders
+### 1. [x] Payday reminders
+
+**Shipped as:** mail only, no `database` channel — the in-app count is worked out from the payouts
+(`pendingPaydays` shared prop), so a stored notification would only be a copy that can go stale.
+`payouts:remind` runs daily at 01:15 UTC (9:15 Manila) and chases each pending payday on the day,
+3 days on and 7 days on (`PaydayReminders::SCHEDULE`), one digest email per person per run, verified
+addresses only. Sidebar badge, dismissible dashboard banner, Settings → Notifications, signed
+one-click unsubscribe. `MustVerifyEmail` is now on. Production still needs a queue worker and SES.
 
 **Why:** paydays open themselves at 01:00 (`payouts:open` in `routes/console.php`), but nobody is
 told. A payday nobody finalizes never reaches the history — that is how a calendar fills up with

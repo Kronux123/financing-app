@@ -34,6 +34,7 @@ class Payout extends Model
             'paid_on' => 'date',
             'status' => PayoutStatus::class,
             'finalized_at' => 'datetime',
+            'reminders_sent' => 'integer',
         ];
     }
 

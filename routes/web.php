@@ -1,15 +1,32 @@
 <?php
 
+use App\Actions\Payouts\PaydayReminders;
 use App\Http\Controllers\ActivityController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\FinanceController;
 use App\Http\Controllers\MonthExportController;
+use App\Http\Controllers\PaydayReminderUnsubscribeController;
 use App\Http\Controllers\PayoutController;
 use App\Http\Controllers\PayoutStatusController;
 use App\Http\Middleware\OpenDuePayouts;
+use App\Notifications\PaydaysAwaitingReview;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 Route::inertia('/', 'welcome')->name('home');
+
+/*
+ * The unsubscribe link in a payday reminder. Signed rather than behind a login,
+ * so it works straight from the inbox. The POST is also what a mail client's
+ * one-click unsubscribe sends, which is why it is exempt from CSRF in
+ * bootstrap/app.php — a mail client has no token to send.
+ */
+Route::middleware('signed')->group(function () {
+    Route::get('payday-reminders/{user}/unsubscribe', [PaydayReminderUnsubscribeController::class, 'show'])
+        ->name('payday-reminders.unsubscribe');
+    Route::post('payday-reminders/{user}/unsubscribe', [PaydayReminderUnsubscribeController::class, 'store'])
+        ->name('payday-reminders.unsubscribe.store');
+});
 
 Route::middleware(['auth', 'verified'])->group(function () {
     /*
@@ -42,5 +59,16 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::put('payouts/{payout}', [PayoutController::class, 'update'])->name('payouts.update');
     Route::patch('payouts/{payout}/status', PayoutStatusController::class)->name('payouts.status');
 });
+
+/*
+ * The reminder email, rendered in the browser while working on it. Local only,
+ * and built from your own pending paydays, so nothing is sent. Mailpit shows
+ * the real thing once `php artisan payouts:remind` has run.
+ */
+if (app()->isLocal()) {
+    Route::get('dev/mail/paydays-awaiting-review', function (Request $request, PaydayReminders $reminders) {
+        return (new PaydaysAwaitingReview($reminders->waitingFor($request->user())))->toMail($request->user());
+    })->middleware('auth');
+}
 
 require __DIR__.'/settings.php';

@@ -13,6 +13,8 @@ declare module '@inertiajs/core' {
             name: string;
             auth: Auth;
             sidebarOpen: boolean;
+            /** Paydays waiting to be reviewed — see HandleInertiaRequests. */
+            pendingPaydays: number;
             [key: string]: unknown;
         };
     }

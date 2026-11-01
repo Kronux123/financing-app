@@ -23,6 +23,15 @@ return Application::configure(basePath: dirname(__DIR__))
             ActivityController::ROWS_COOKIE,
         ]);
 
+        /*
+         * A mail client's one-click unsubscribe POSTs to the link in the email
+         * with no session and no token. The link is signed, which is the check
+         * that matters here — see routes/web.php.
+         */
+        $middleware->validateCsrfTokens(except: [
+            'payday-reminders/*/unsubscribe',
+        ]);
+
         $middleware->web(append: [
             HandleAppearance::class,
             HandleInertiaRequests::class,
