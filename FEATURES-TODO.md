@@ -8,28 +8,21 @@ fresh session can pick it up cold.
 
 ## Worth building
 
-### 1. [x] Payday reminders
+### 1. [x] ~~Payday reminders~~ — done 2026-11-01
+
+**Why it mattered:** paydays open themselves, but nobody was told. A payday nobody finalizes never
+reaches the history — that is how a calendar fills up with "Nothing settled" months.
 
 **Shipped as:** mail only, no `database` channel — the in-app count is worked out from the payouts
 (`pendingPaydays` shared prop), so a stored notification would only be a copy that can go stale.
 `payouts:remind` runs daily at 01:15 UTC (9:15 Manila) and chases each pending payday on the day,
 3 days on and 7 days on (`PaydayReminders::SCHEDULE`), one digest email per person per run, verified
 addresses only. Sidebar badge, dismissible dashboard banner, Settings → Notifications, signed
-one-click unsubscribe. `MustVerifyEmail` is now on. Production still needs a queue worker and SES.
+one-click unsubscribe, a Kept mail theme for every email. `MustVerifyEmail` is now on.
+Locally, mail goes to Mailpit (`compose.dev.yaml`) and `composer dev` runs the queue and scheduler.
 
-**Why:** paydays open themselves at 01:00 (`payouts:open` in `routes/console.php`), but nobody is
-told. A payday nobody finalizes never reaches the history — that is how a calendar fills up with
-"Nothing settled" months. Every other screen depends on this one habit.
-
-**Shape:** a Laravel notification with `mail` and `database` channels.
-- Mail: a digest such as "2 paydays awaiting review", queued, sent at most once per payday.
-- In-app: a badge on Payouts in the sidebar, plus a banner on the dashboard. Inertia's polling (or a
-  plain reload) is enough here — see the note on WebSockets at the bottom.
-- A setting to turn the mail off.
-
-**Build on:** `PayoutStatus::Pending`, the `OpenDuePayouts` middleware, `payouts:open`.
-**Blocks on:** working mail in production (already needed for email verification and password
-reset — see the deployment traps memory).
+**Still open for production:** a queue worker container next to the scheduler, real mail (SES), and
+`MAIL_FROM_ADDRESS` on our own domain.
 
 ### 2. [ ] One-off income — 13th-month pay and bonuses
 
@@ -67,7 +60,7 @@ before touching it — the two-table ordering is the hard part.
 
 ### 5. [ ] Installable on a phone (PWA manifest)
 
-Recording a payday is a phone moment. A web manifest, icons and a theme colour make it
+Recording a payday is a phone moment. A web manifest, icons and a theme color make it
 home-screen-able. No service worker needed to start.
 
 ### 6. [ ] Planned vs actual, per line, over time
@@ -95,9 +88,9 @@ activity log.
 
 ## Infrastructure notes
 
-**Queues — yes, adopt with reminders.** `QUEUE_CONNECTION=database` is already set, but there are
-no jobs yet (`app/Jobs` does not exist). First uses: queued reminder mail, and the month PDF export
-(PDF rendering is slow enough to hold a request). On AWS, either keep the database driver with one
+**Queues — adopted.** Reminder mail is the first queued work (`PaydaysAwaitingReview` implements
+`ShouldQueue`, on the database queue). Next candidate: the month PDF export, which is slow enough
+to hold a request. On AWS, either keep the database driver with one
 worker container, or switch to SQS. Either way it is one more long-running process to deploy.
 
 **WebSockets — not yet.** A reminder has to reach someone who is *not* on the site, which is mail's
