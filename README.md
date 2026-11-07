@@ -1,134 +1,181 @@
-# Kept
+<div align="center">
+  <img src="public/favicon.svg" width="88" height="88" alt="Kept">
 
-[![tests](https://github.com/Kronux123/financing-app/actions/workflows/tests.yml/badge.svg)](https://github.com/Kronux123/financing-app/actions/workflows/tests.yml)
-[![linter](https://github.com/Kronux123/financing-app/actions/workflows/lint.yml/badge.svg)](https://github.com/Kronux123/financing-app/actions/workflows/lint.yml)
+  <h1>Kept</h1>
 
-**Plan what comes in. Record what goes out.**
+  <p><strong>Plan what comes in. Record what goes out.</strong></p>
 
-Kept is a personal finance planner for people paid once or twice a month. You
-give every peso of each paycheck a job before it arrives, then check each payday
-against the plan when it comes. Over time that builds an honest record of what
-you actually saved, month by month.
+  <p>
+    A personal finance planner for people paid once or twice a month.<br>
+    Give every peso a job before payday, then see what you actually saved.
+  </p>
+
+  <p>
+    <a href="https://github.com/Kronux123/financing-app/actions/workflows/tests.yml"><img src="https://github.com/Kronux123/financing-app/actions/workflows/tests.yml/badge.svg" alt="tests"></a>
+    <a href="https://github.com/Kronux123/financing-app/actions/workflows/lint.yml"><img src="https://github.com/Kronux123/financing-app/actions/workflows/lint.yml/badge.svg" alt="linter"></a>
+  </p>
+
+  <p>
+    <a href="#features">Features</a>
+    &nbsp;·&nbsp;
+    <a href="#how-it-works">How it works</a>
+    &nbsp;·&nbsp;
+    <a href="#a-closer-look">Screenshots</a>
+    &nbsp;·&nbsp;
+    <a href="#built-with">Built with</a>
+  </p>
+</div>
+
+<br>
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset=".github/readme/dashboard-dark.png">
   <img alt="The Kept dashboard: where this month's pay goes, total saved, the emergency fund, outstanding debt and recent activity" src=".github/readme/dashboard-light.png">
 </picture>
 
-## What it does
+<br>
 
-### Give every peso a job
+## Features
 
-Tell Kept how you are paid, once a month or on the 15th and the last day, then
-split each paycheck into payables, allowance and savings. Enter your gross pay
-and SSS, PhilHealth, Pag-IBIG and withholding tax are worked out for you. A
-paycheck can sweep whatever is left into savings, and a plan that spends more
-than a paycheck holds says so.
+<table>
+  <tr>
+    <td width="33%" valign="top">
+      <h3>Give every peso a job</h3>
+      Split each paycheck into payables, allowance and savings. Enter your gross
+      and SSS, PhilHealth, Pag-IBIG and tax are worked out for you.
+    </td>
+    <td width="33%" valign="top">
+      <h3>Check each payday</h3>
+      Paydays open by themselves, filled in from your plan. Fix what came out
+      different, then finalize.
+    </td>
+    <td width="33%" valign="top">
+      <h3>See every month</h3>
+      A savings calendar graded against your goal, with any month as a
+      spreadsheet or a PDF.
+    </td>
+  </tr>
+  <tr>
+    <td width="33%" valign="top">
+      <h3>Watch debt go down</h3>
+      What is left on each debt, how far through you are, and when you will be
+      free of it.
+    </td>
+    <td width="33%" valign="top">
+      <h3>Every peso in and out</h3>
+      One log of each payday's income and spending, with anything unplanned
+      tagged.
+    </td>
+    <td width="33%" valign="top">
+      <h3>A tour of every page</h3>
+      Short walkthroughs, shown over sample data when you are just starting
+      out.
+    </td>
+  </tr>
+</table>
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset=".github/readme/plan-dark.png">
-  <img alt="The budget plan, with a paycheck on the 15th and one at the end of the month, each split into payables, allowance and savings" src=".github/readme/plan-light.png">
-</picture>
-
-### Check each payday
-
-When a payday comes, it opens by itself, filled in from your plan. Correct
-whatever came out differently, add the one-off nobody planned for, like a repair
-or a hospital visit, and finalize it. A payday you have not reviewed shows up on
-the dashboard, and Kept can remind you by email.
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset=".github/readme/payouts-dark.png">
-  <img alt="A payday being reviewed: each planned line with what actually went out, and what is left" src=".github/readme/payouts-light.png">
-</picture>
-
-### See how every month went
-
-The savings calendar lays out the year and shades each month by how close it
-came to your goal. Any settled month downloads as a spreadsheet or a PDF
-statement, and a whole year as one workbook.
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset=".github/readme/calendar-dark.png">
-  <img alt="The savings calendar: the year's total against its goal, the best and lowest months, and each month graded against the monthly goal" src=".github/readme/calendar-light.png">
-</picture>
-
-### Watch your debt go down
-
-Mark a payable as debt and Kept shows what is left on it, how far through you
-are, and when you will be debt-free at the payments you make now.
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset=".github/readme/debt-dark.png">
-  <img alt="The debt page: the total owed, when it will be paid off, and the balance left on each debt" src=".github/readme/debt-light.png">
-</picture>
-
-### Every peso in and out
-
-The activity log lists every payday's money, newest first. Spending nobody
-planned is tagged, and a payday you have not finalized yet is marked as pending.
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset=".github/readme/activities-dark.png">
-  <img alt="The activity log: each payday's income and spending, with its category and status" src=".github/readme/activities-light.png">
-</picture>
-
-### A tour of every page
-
-The first time you open a page, a short walkthrough explains it. On a page you
-have no data on yet, the tour runs over a clearly labeled sample account, so you
-can see what it will look like before you have entered anything.
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset=".github/readme/walkthrough-dark.png">
-  <img alt="The dashboard walkthrough spotlighting where this month's pay goes" src=".github/readme/walkthrough-light.png">
-</picture>
-
-Also: two-factor authentication and passkeys, required email verification,
-light and dark themes, and a layout that works on a phone.
+Also: payday reminders by email, two-factor authentication and passkeys, and
+light and dark themes.
 
 ## How it works
 
-1. **Plan.** Your budget plan says what each paycheck is for.
-2. **Review.** Each payday opens as a copy of the plan. You correct what was
-   different and finalize it.
-3. **Look back.** Finalized paydays become your history: the savings calendar,
-   the charts, the activity log and the exports all read from them.
+<table>
+  <tr>
+    <td width="33%" valign="top" align="center">
+      <h3>1 · Plan</h3>
+      Say what each paycheck is for, before it arrives.
+    </td>
+    <td width="33%" valign="top" align="center">
+      <h3>2 · Review</h3>
+      Each payday opens from the plan. Correct it and finalize.
+    </td>
+    <td width="33%" valign="top" align="center">
+      <h3>3 · Look back</h3>
+      Finalized paydays become your history, month by month.
+    </td>
+  </tr>
+</table>
 
-The copy in step 2 is the important part. A payday never points back at the
-plan, so raising your rent in March cannot change what February cost.
+Each payday keeps its own copy of the plan, so changing your plan later never
+rewrites a month that already happened.
 
-## Under the hood
+## A closer look
 
-Laravel 13, React 19 with Inertia 3 and TypeScript, Tailwind CSS 4, and
-PostgreSQL 17. Authentication is Laravel Fortify with passkeys, PDFs are
-rendered through headless Chromium, and spreadsheets are real `.xlsx` files
-written with PhpSpreadsheet.
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset=".github/readme/plan-dark.png">
+        <img alt="The budget plan, with a paycheck on the 15th and one at the end of the month, each split into payables, allowance and savings" src=".github/readme/plan-light.png">
+      </picture>
+      <p align="center"><strong>Budget plan</strong><br><sub>Two paychecks, each with its own jobs</sub></p>
+    </td>
+    <td width="50%" valign="top">
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset=".github/readme/payouts-dark.png">
+        <img alt="A payday: each planned line with what actually went out, and what is left" src=".github/readme/payouts-light.png">
+      </picture>
+      <p align="center"><strong>Paydays</strong><br><sub>What the plan said, next to what happened</sub></p>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset=".github/readme/calendar-dark.png">
+        <img alt="The savings calendar: the year's total against its goal, the best and lowest months, and each month graded against the monthly goal" src=".github/readme/calendar-light.png">
+      </picture>
+      <p align="center"><strong>Savings calendar</strong><br><sub>The whole year, graded against your goal</sub></p>
+    </td>
+    <td width="50%" valign="top">
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset=".github/readme/debt-dark.png">
+        <img alt="The debt page: the total owed, when it will be paid off, and the balance left on each debt" src=".github/readme/debt-light.png">
+      </picture>
+      <p align="center"><strong>Debt</strong><br><sub>What is left, and when it will be gone</sub></p>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset=".github/readme/activities-dark.png">
+        <img alt="The activity log: each payday's income and spending, with its category and status" src=".github/readme/activities-light.png">
+      </picture>
+      <p align="center"><strong>Activity log</strong><br><sub>Every peso in and out, newest first</sub></p>
+    </td>
+    <td width="50%" valign="top">
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset=".github/readme/walkthrough-dark.png">
+        <img alt="The dashboard walkthrough spotlighting where this month's pay goes" src=".github/readme/walkthrough-light.png">
+      </picture>
+      <p align="center"><strong>Walkthroughs</strong><br><sub>A guided tour the first time you open a page</sub></p>
+    </td>
+  </tr>
+</table>
 
-Every change runs through CI: about 470 tests, including real-browser tests that
-check every page for JavaScript errors and accessibility violations in both
-light and dark mode, plus PHPStan, Pint, ESLint, Prettier and TypeScript checks.
-The suite runs on PostgreSQL, as production does.
+<p align="center"><sub>Click any screenshot to see it full size.</sub></p>
 
-A few decisions worth knowing about:
+## Built with
 
-- **Money is stored in centavos and sent in pesos.** The conversion happens in
-  exactly two places, on the way out and on the way in, so a figure can never be
-  off by a factor of a hundred somewhere in between.
-- **Saving is measured, not summed.** A month's saving is income minus what went
-  to living costs, rather than the savings lines added up. That way a paycheck
-  that sweeps its leftover into savings is counted in full.
-- **Reminders are counted, not stored.** The badge, the banner and the email all
-  count pending paydays straight from the ledger, so they can never say "2
-  waiting" after both were finalized.
-- **Color never carries meaning alone.** Goal progress uses orange, blue and
-  green, chosen to stay distinct for color-blind readers, and the exact
-  percentage is always printed next to it.
+<p>
+  <img src="https://img.shields.io/badge/Laravel_13-FF2D20?style=for-the-badge&logo=laravel&logoColor=white" alt="Laravel 13">
+  <img src="https://img.shields.io/badge/PHP-777BB4?style=for-the-badge&logo=php&logoColor=white" alt="PHP">
+  <img src="https://img.shields.io/badge/React_19-20232A?style=for-the-badge&logo=react&logoColor=61DAFB" alt="React 19">
+  <img src="https://img.shields.io/badge/Inertia_3-9553E9?style=for-the-badge&logo=inertia&logoColor=white" alt="Inertia 3">
+  <img src="https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript">
+  <img src="https://img.shields.io/badge/Tailwind_CSS_4-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white" alt="Tailwind CSS 4">
+  <img src="https://img.shields.io/badge/PostgreSQL_17-4169E1?style=for-the-badge&logo=postgresql&logoColor=white" alt="PostgreSQL 17">
+</p>
 
-## Status
+<p>
+  <img src="https://img.shields.io/badge/Pest-F28D1A?style=for-the-badge&logoColor=white" alt="Pest">
+  <img src="https://img.shields.io/badge/Playwright-2EAD33?style=for-the-badge&logoColor=white" alt="Playwright">
+  <img src="https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white" alt="Docker">
+  <img src="https://img.shields.io/badge/GitHub_Actions-2088FF?style=for-the-badge&logo=githubactions&logoColor=white" alt="GitHub Actions">
+  <img src="https://img.shields.io/badge/Laravel_Herd-FF2D20?style=for-the-badge&logo=laravel&logoColor=white" alt="Laravel Herd">
+</p>
 
-Kept is a personal project, built to be used. What comes next is tracked in
-[`FEATURES-TODO.md`](FEATURES-TODO.md).
+Sign-in is handled by Laravel Fortify, spreadsheets by PhpSpreadsheet, and PDFs
+by headless Chromium. Local email goes to Mailpit.
 
 ## License
 
