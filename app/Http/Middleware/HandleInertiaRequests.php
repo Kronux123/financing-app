@@ -2,8 +2,11 @@
 
 namespace App\Http\Middleware;
 
+use App\Enums\WalkthroughPage;
 use App\Http\Resources\BudgetPlanResource;
+use Closure;
 use Illuminate\Http\Request;
+use Inertia\Inertia;
 use Inertia\Middleware;
 
 class HandleInertiaRequests extends Middleware
@@ -25,6 +28,41 @@ class HandleInertiaRequests extends Middleware
     public function version(Request $request): ?string
     {
         return parent::version($request);
+    }
+
+    /**
+     * Encrypts each page's props in the browser history wherever the browser
+     * is able to, so that clearing the history when the signed-in user changes
+     * leaves the back button nothing it can redraw — see
+     * resources/js/lib/session-history.ts.
+     *
+     * Decided per request rather than switched on in config, because
+     * encryption is all or nothing in the browser. Outside a secure context
+     * there is no Web Crypto, Inertia cannot make a key, and it throws in the
+     * middle of every visit instead of falling back: links on a plain http site
+     * simply stop working.
+     */
+    public function handle(Request $request, Closure $next): mixed
+    {
+        Inertia::encryptHistory($this->browserCanEncrypt($request));
+
+        return parent::handle($request, $next);
+    }
+
+    /**
+     * The browser's own rule for a secure context: https, or this machine.
+     *
+     * Behind a load balancer that ends TLS, isSecure() is only true once the
+     * proxy is trusted. Untrusted, this reads false and history simply goes
+     * unencrypted, which is the safe way for it to be wrong.
+     */
+    private function browserCanEncrypt(Request $request): bool
+    {
+        $host = $request->getHost();
+
+        return $request->isSecure()
+            || in_array($host, ['localhost', '127.0.0.1', '[::1]', '::1'], true)
+            || str_ends_with($host, '.localhost');
     }
 
     /**
@@ -57,6 +95,11 @@ class HandleInertiaRequests extends Middleware
              * request.
              */
             'pendingPaydays' => fn (): int => $this->pendingPaydays($request),
+            /**
+             * Pages whose current walkthrough is finished or skipped. Every
+             * other page with one shows it on arrival.
+             */
+            'seenWalkthroughs' => fn (): array => $this->seenWalkthroughs($request),
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
         ];
     }
@@ -68,6 +111,19 @@ class HandleInertiaRequests extends Middleware
     private function pendingPaydays(Request $request): int
     {
         return $request->user()?->payouts()->reorder()->pending()->count() ?? 0;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function seenWalkthroughs(Request $request): array
+    {
+        return $request->user()?->walkthroughProgress()
+            ->current()
+            ->pluck('page')
+            ->map(fn (WalkthroughPage $page): string => $page->value)
+            ->values()
+            ->all() ?? [];
     }
 
     /**

@@ -32,3 +32,8 @@ Make an actual edit before clicking save. The same trap applies to any control t
 Pest serves the app through its own HTTP server (`LaravelHttpServer`), which builds the Laravel request with an empty files array — the source literally reads `// @TODO files...`. A multipart form submitted from a browser test reaches the controller without its file, so validation answers "The file field is required." however the file was attached. `attach()` fails earlier still when Playwright is not local ("localPaths are not allowed").
 
 Test an upload as a feature test with `UploadedFile::fake()->createWithContent()`, and keep the browser test to the dialog, the copy and accessibility. Plan import is covered this way in tests/Feature/BudgetPlanFileTest.php.
+
+## A walkthrough opens on first visit and blocks clicks
+A page with a walkthrough (see App\Enums\WalkthroughPage) opens it on a user's first visit, and its overlay sits over the whole page. A test that then clicks something on that page does not fail: Playwright waits for the element to become clickable and the run hangs until the suite timeout.
+
+Any browser test that is not about the walkthrough itself creates its user with `User::factory()->walkthroughsSeen()`. Walkthrough behavior is tested in tests/Browser/WalkthroughTest.php.

@@ -6,6 +6,10 @@ import AppLayout from '@/layouts/app-layout';
 import AuthLayout from '@/layouts/auth-layout';
 import SettingsLayout from '@/layouts/settings/layout';
 import { appName } from '@/lib/app';
+import { clearHistoryWhenUserChanges } from '@/lib/session-history';
+
+// Before the app starts, so the first page's navigate event is seen too.
+clearHistoryWhenUserChanges();
 
 createInertiaApp({
     title: (title) => (title ? `${title} - ${appName}` : appName),

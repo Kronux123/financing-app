@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Enums\WalkthroughPage;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\Hash;
@@ -44,6 +45,23 @@ class UserFactory extends Factory
         return $this->state(fn (array $attributes) => [
             'email_verified_at' => null,
         ]);
+    }
+
+    /**
+     * Past every page's walkthrough, so a test about the page itself is not
+     * met by one covering it.
+     */
+    public function walkthroughsSeen(): static
+    {
+        return $this->afterCreating(function (User $user): void {
+            foreach (WalkthroughPage::cases() as $page) {
+                $user->walkthroughProgress()->create([
+                    'page' => $page,
+                    'version' => $page->version(),
+                    'completed_at' => now(),
+                ]);
+            }
+        });
     }
 
     /**

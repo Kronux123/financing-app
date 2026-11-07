@@ -9,12 +9,14 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { Walkthrough, WalkthroughButton } from '@/components/walkthrough';
 import { useStoredBudgetPlan } from '@/hooks/use-budget-plan';
 import {
     setPayoutStatus,
     usePayoutDraft,
     useStoredPayouts,
 } from '@/hooks/use-payouts';
+import { useWalkthrough } from '@/hooks/use-walkthrough';
 import { allowanceGroupId } from '@/lib/budget';
 import { formatPeso, formatSigned } from '@/lib/currency';
 import type { Payout } from '@/lib/payout';
@@ -29,6 +31,7 @@ import {
     withoutLine,
 } from '@/lib/payout';
 import { cn } from '@/lib/utils';
+import { walkthroughs, walkthroughTarget } from '@/lib/walkthroughs';
 import { dashboard } from '@/routes';
 import { edit as financeRoute } from '@/routes/finance';
 import { index as payoutsRoute } from '@/routes/payouts';
@@ -179,6 +182,7 @@ function AddLine({
                 variant="ghost"
                 size="sm"
                 data-test={`payout-add-line-${payout.key}`}
+                {...walkthroughTarget('payout-add-line')}
                 onClick={() => setOpen(true)}
                 className="mt-3 -ml-2 text-muted-foreground"
             >
@@ -302,7 +306,11 @@ function PayoutDetail({ payout: stored }: { payout: Payout }) {
     };
 
     return (
-        <Card data-test="payout-card" className="gap-0 overflow-hidden py-0">
+        <Card
+            data-test="payout-card"
+            {...walkthroughTarget('payout-card')}
+            className="gap-0 overflow-hidden py-0"
+        >
             <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b border-border px-5 py-4">
                 <div className="flex items-baseline gap-3">
                     <h2
@@ -487,6 +495,7 @@ function PayoutDetail({ payout: stored }: { payout: Payout }) {
                         variant={finalized ? 'outline' : 'default'}
                         size="sm"
                         data-test={`payout-toggle-${payout.key}`}
+                        {...walkthroughTarget('payout-finalize')}
                         onClick={toggleStatus}
                     >
                         {finalized ? (
@@ -505,6 +514,7 @@ function PayoutDetail({ payout: stored }: { payout: Payout }) {
 }
 
 export default function Payouts() {
+    const walkthrough = useWalkthrough('payouts');
     const plan = useStoredBudgetPlan();
     /**
      * Newest first, and only paydays that have actually been: the daily
@@ -542,28 +552,32 @@ export default function Payouts() {
                         </div>
                     </div>
 
-                    {payouts.length > 0 && (
-                        <p
-                            data-test="payouts-pending"
-                            className="text-sm tabular-nums"
-                        >
-                            {pending === 0 ? (
-                                <span className="text-muted-foreground">
-                                    All reviewed
-                                </span>
-                            ) : (
-                                <>
-                                    <span className="font-semibold">
-                                        {pending}
-                                    </span>
+                    <div className="flex flex-wrap items-center gap-4">
+                        {payouts.length > 0 && (
+                            <p
+                                data-test="payouts-pending"
+                                {...walkthroughTarget('payouts-pending')}
+                                className="text-sm tabular-nums"
+                            >
+                                {pending === 0 ? (
                                     <span className="text-muted-foreground">
-                                        {' '}
-                                        awaiting review
+                                        All reviewed
                                     </span>
-                                </>
-                            )}
-                        </p>
-                    )}
+                                ) : (
+                                    <>
+                                        <span className="font-semibold">
+                                            {pending}
+                                        </span>
+                                        <span className="text-muted-foreground">
+                                            {' '}
+                                            awaiting review
+                                        </span>
+                                    </>
+                                )}
+                            </p>
+                        )}
+                        <WalkthroughButton onClick={walkthrough.start} />
+                    </div>
                 </header>
 
                 {payouts.length === 0 ? (
@@ -617,6 +631,14 @@ export default function Payouts() {
                     </Button>
                 </div>
             </div>
+
+            {walkthrough.isOpen && (
+                <Walkthrough
+                    steps={walkthroughs.payouts}
+                    isSample={walkthrough.isSample}
+                    onFinish={walkthrough.finish}
+                />
+            )}
         </>
     );
 }

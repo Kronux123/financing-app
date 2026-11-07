@@ -31,7 +31,9 @@ export default function PasskeyVerify({
             },
         }),
         onSuccess: (response) => {
-            router.visit(response.redirect ?? '/dashboard');
+            // In place of the login or confirm page, not after it, so back
+            // never returns to a form that has already been answered.
+            router.visit(response.redirect ?? '/dashboard', { replace: true });
         },
     });
 

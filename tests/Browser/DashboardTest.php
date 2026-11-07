@@ -4,7 +4,7 @@ use App\Models\BudgetPlan;
 use App\Models\User;
 
 beforeEach(function () {
-    $this->user = User::factory()->create();
+    $this->user = User::factory()->walkthroughsSeen()->create();
 
     $this->actingAs($this->user);
 });

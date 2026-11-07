@@ -36,6 +36,14 @@ return Application::configure(basePath: dirname(__DIR__))
             HandleAppearance::class,
             HandleInertiaRequests::class,
             AddLinkHeadersForPreloadedAssets::class,
+            /*
+             * Never kept by the browser. Going back to a page that was a full
+             * load is answered from the browser's own caches, skipping both the
+             * server and Inertia's history guard — so after signing out, back
+             * could redraw a page with somebody's figures on it. The compiled
+             * assets are files on disk, not routes, and stay cacheable.
+             */
+            'cache.headers:no_store;private',
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

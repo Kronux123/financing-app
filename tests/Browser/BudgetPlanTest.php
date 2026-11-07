@@ -3,7 +3,7 @@
 use App\Models\User;
 
 beforeEach(function () {
-    $this->actingAs(User::factory()->create());
+    $this->actingAs(User::factory()->walkthroughsSeen()->create());
 });
 
 test('the budget plan renders for an authenticated user', function () {

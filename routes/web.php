@@ -8,6 +8,7 @@ use App\Http\Controllers\MonthExportController;
 use App\Http\Controllers\PaydayReminderUnsubscribeController;
 use App\Http\Controllers\PayoutController;
 use App\Http\Controllers\PayoutStatusController;
+use App\Http\Controllers\WalkthroughController;
 use App\Http\Middleware\OpenDuePayouts;
 use App\Notifications\PaydaysAwaitingReview;
 use Illuminate\Http\Request;
@@ -58,6 +59,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::inertia('debt', 'debt/index')->name('debt.index');
     Route::put('payouts/{payout}', [PayoutController::class, 'update'])->name('payouts.update');
     Route::patch('payouts/{payout}/status', PayoutStatusController::class)->name('payouts.status');
+    Route::put('walkthroughs/{page}', WalkthroughController::class)->name('walkthroughs.update');
 });
 
 /*

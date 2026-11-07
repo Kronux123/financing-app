@@ -11,11 +11,13 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { Walkthrough, WalkthroughButton } from '@/components/walkthrough';
 import {
     useBudgetPlanDraft,
     useStoredBudgetPlan,
 } from '@/hooks/use-budget-plan';
 import { useDeductions } from '@/hooks/use-deductions';
+import { useWalkthrough } from '@/hooks/use-walkthrough';
 import type { EmergencyFund, ExpenseItem, PayCadence } from '@/lib/budget';
 import {
     cadenceOptions,
@@ -25,10 +27,12 @@ import {
 } from '@/lib/budget';
 import type { Deductions } from '@/lib/deductions';
 import { isPaidFromGross, withPaycheckAmounts } from '@/lib/deductions';
+import { walkthroughs, walkthroughTarget } from '@/lib/walkthroughs';
 import { dashboard } from '@/routes';
 import { edit as financeRoute } from '@/routes/finance';
 
 export default function Finance() {
+    const walkthrough = useWalkthrough('finance');
     const {
         plan,
         isDirty,
@@ -200,6 +204,7 @@ export default function Finance() {
                     description="Set how you get paid, then give every peso a job before it arrives."
                     actions={
                         <>
+                            <WalkthroughButton onClick={walkthrough.start} />
                             <PlanFileActions
                                 hasSavedPlan={hasSavedPlan}
                                 onImported={discardChanges}
@@ -211,6 +216,7 @@ export default function Finance() {
                             )}
                             <Button
                                 data-test="save-plan"
+                                {...walkthroughTarget('save-plan')}
                                 disabled={!isDirty}
                                 onClick={handleSave}
                             >
@@ -222,7 +228,10 @@ export default function Finance() {
 
                 <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_22rem] 2xl:grid-cols-[minmax(0,1fr)_24rem]">
                     <div className="min-w-0 space-y-6">
-                        <Card className="gap-0 py-0">
+                        <Card
+                            className="gap-0 py-0"
+                            {...walkthroughTarget('pay-schedule')}
+                        >
                             <CardContent className="divide-y divide-border px-0">
                                 <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 px-6 py-5">
                                     <div className="min-w-0">
@@ -316,6 +325,7 @@ export default function Finance() {
                          * rows are what line their sections up side by side.
                          */}
                         <div
+                            {...walkthroughTarget('paychecks')}
                             className={
                                 plan.cadence === 'semi-monthly'
                                     ? 'grid gap-6 lg:grid-cols-2'
@@ -356,23 +366,30 @@ export default function Finance() {
                      * every edit without scrolling back up to check them.
                      */}
                     <aside className="space-y-6 xl:sticky xl:top-6">
-                        <PlanSummary plan={plan} />
+                        <div {...walkthroughTarget('plan-summary')}>
+                            <PlanSummary plan={plan} />
+                        </div>
 
-                        <SavingsCard
-                            plan={plan}
-                            onMonthsOfCoverChange={(monthsOfCover) =>
-                                handleEmergencyFundChange({ monthsOfCover })
-                            }
-                            onBalanceChange={(balance) =>
-                                handleEmergencyFundChange({ balance })
-                            }
-                            onPotBalanceChange={(balance) =>
-                                updatePlan({
-                                    ...plan,
-                                    savingsPot: { ...plan.savingsPot, balance },
-                                })
-                            }
-                        />
+                        <div {...walkthroughTarget('savings-setup')}>
+                            <SavingsCard
+                                plan={plan}
+                                onMonthsOfCoverChange={(monthsOfCover) =>
+                                    handleEmergencyFundChange({ monthsOfCover })
+                                }
+                                onBalanceChange={(balance) =>
+                                    handleEmergencyFundChange({ balance })
+                                }
+                                onPotBalanceChange={(balance) =>
+                                    updatePlan({
+                                        ...plan,
+                                        savingsPot: {
+                                            ...plan.savingsPot,
+                                            balance,
+                                        },
+                                    })
+                                }
+                            />
+                        </div>
 
                         <Button variant="ghost" asChild size="sm">
                             <Link href={dashboard()}>Back to dashboard</Link>
@@ -380,6 +397,14 @@ export default function Finance() {
                     </aside>
                 </div>
             </div>
+
+            {walkthrough.isOpen && (
+                <Walkthrough
+                    steps={walkthroughs.finance}
+                    isSample={walkthrough.isSample}
+                    onFinish={walkthrough.finish}
+                />
+            )}
         </>
     );
 }

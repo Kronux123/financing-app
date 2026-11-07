@@ -1,6 +1,11 @@
 import { router, usePage } from '@inertiajs/react';
 import { useState } from 'react';
 import type { Payout, PayoutStatus } from '@/lib/payout';
+import { sampleAccount } from '@/lib/sample-account';
+import {
+    isSamplePreviewActive,
+    useIsSamplePreview,
+} from '@/lib/sample-preview';
 import {
     status as payoutStatusRoute,
     update as updatePayout,
@@ -11,14 +16,21 @@ import {
  *
  * Passed by `PayoutController@index` rather than shared, because this is the
  * only page that reads them. There is no loading state and no hydration dance —
- * the value is the same on the server and the client.
+ * the value is the same on the server and the client. The sample account's
+ * paydays stand in while a walkthrough previews one.
  */
 export function useStoredPayouts(): Payout[] {
-    return usePage<{ payouts: Payout[] }>().props.payouts;
+    const ownPayouts = usePage<{ payouts: Payout[] }>().props.payouts;
+
+    return useIsSamplePreview() ? sampleAccount().payouts : ownPayouts;
 }
 
 /** Writes one record, then lets the reloaded props come back with it. */
 export const savePayout = (payout: Payout, onSuccess?: () => void): void => {
+    if (isSamplePreviewActive()) {
+        return;
+    }
+
     router.put(updatePayout(payout.id).url, serialise(payout), {
         preserveScroll: true,
         onSuccess,
@@ -31,6 +43,10 @@ export const savePayout = (payout: Payout, onSuccess?: () => void): void => {
  * account of it.
  */
 export const setPayoutStatus = (payout: Payout, status: PayoutStatus): void => {
+    if (isSamplePreviewActive()) {
+        return;
+    }
+
     router.patch(
         payoutStatusRoute(payout.id).url,
         { status },

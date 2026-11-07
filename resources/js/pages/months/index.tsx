@@ -7,12 +7,15 @@ import type { SpriteName } from '@/components/pixel-art';
 import { PixelArt, SpriteTile } from '@/components/pixel-art';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { Walkthrough, WalkthroughButton } from '@/components/walkthrough';
 import { useStoredBudgetPlan } from '@/hooks/use-budget-plan';
 import { useSavingsHistory } from '@/hooks/use-savings';
+import { useWalkthrough } from '@/hooks/use-walkthrough';
 import { savingsPerMonth } from '@/lib/budget';
 import { formatPeso } from '@/lib/currency';
 import { monthsForYear, summariseYear, yearsIn } from '@/lib/savings';
 import { cn } from '@/lib/utils';
+import { walkthroughs, walkthroughTarget } from '@/lib/walkthroughs';
 import { dashboard } from '@/routes';
 import {
     pdf as monthPdf,
@@ -117,6 +120,7 @@ function YearTrack({ year, total, goal, recorded }: YearTrackProps) {
 }
 
 export default function DashboardMonths() {
+    const walkthrough = useWalkthrough('months');
     const history = useSavingsHistory();
     const plan = useStoredBudgetPlan();
 
@@ -207,9 +211,12 @@ export default function DashboardMonths() {
                             </p>
                         </div>
                     </div>
-                    <Button asChild variant="outline" size="sm">
-                        <Link href={dashboard()}>Back to dashboard</Link>
-                    </Button>
+                    <div className="flex flex-wrap items-center gap-2">
+                        <WalkthroughButton onClick={walkthrough.start} />
+                        <Button asChild variant="outline" size="sm">
+                            <Link href={dashboard()}>Back to dashboard</Link>
+                        </Button>
+                    </div>
                 </header>
 
                 {history.length === 0 ? (
@@ -238,7 +245,10 @@ export default function DashboardMonths() {
                          */}
                         <Card className="gap-0 py-0">
                             <CardContent className="grid gap-6 p-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)] lg:gap-10">
-                                <div className="flex flex-col gap-5">
+                                <div
+                                    className="flex flex-col gap-5"
+                                    {...walkthroughTarget('calendar-year')}
+                                >
                                     <div className="flex items-center justify-between gap-3">
                                         <div className="-ml-2 flex items-center gap-1">
                                             <Button
@@ -323,7 +333,10 @@ export default function DashboardMonths() {
                                  * list and its terms, which is not a shape a
                                  * description list may take.
                                  */}
-                                <div className="grid grid-cols-2 gap-3 self-center">
+                                <div
+                                    className="grid grid-cols-2 gap-3 self-center"
+                                    {...walkthroughTarget('calendar-summary')}
+                                >
                                     {summary.map((item) => (
                                         <div
                                             key={item.label}
@@ -353,7 +366,7 @@ export default function DashboardMonths() {
                             </CardContent>
                         </Card>
 
-                        <Card>
+                        <Card {...walkthroughTarget('calendar-months')}>
                             <CardContent>
                                 <SavingsCalendar
                                     months={months}
@@ -376,6 +389,14 @@ export default function DashboardMonths() {
                     </>
                 )}
             </div>
+
+            {walkthrough.isOpen && (
+                <Walkthrough
+                    steps={walkthroughs.months}
+                    isSample={walkthrough.isSample}
+                    onFinish={walkthrough.finish}
+                />
+            )}
         </>
     );
 }

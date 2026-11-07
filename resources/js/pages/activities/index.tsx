@@ -17,6 +17,8 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import { Walkthrough, WalkthroughButton } from '@/components/walkthrough';
+import { useWalkthrough } from '@/hooks/use-walkthrough';
 import type {
     Activity,
     ActivityPagination as Pagination,
@@ -28,6 +30,8 @@ import {
     statusLabel,
 } from '@/lib/activities';
 import { formatSigned } from '@/lib/currency';
+import { sampleActivityPage } from '@/lib/sample-account';
+import { walkthroughs, walkthroughTarget } from '@/lib/walkthroughs';
 import { dashboard } from '@/routes';
 import { activities as activitiesRoute } from '@/routes/dashboard';
 import { index as payoutsRoute } from '@/routes/payouts';
@@ -60,10 +64,12 @@ type ActivitiesPageProps = {
     pagination: Pagination;
 };
 
-export default function ActivitiesPage({
-    activities,
-    pagination,
-}: ActivitiesPageProps) {
+export default function ActivitiesPage(ownPage: ActivitiesPageProps) {
+    const walkthrough = useWalkthrough('activities');
+    const { activities, pagination } = walkthrough.isSample
+        ? sampleActivityPage(ownPage.pagination.rowsPerPage)
+        : ownPage;
+
     /*
      * The page is a url, so stepping through the log is ordinary navigation:
      * shareable, and something the back button can undo. `activities` is only
@@ -94,9 +100,14 @@ export default function ActivitiesPage({
                     title="Activities"
                     description="Every payday you have recorded: what came in, what went out, and what is still open to correction."
                     actions={
-                        <Button asChild variant="ghost" size="sm">
-                            <Link href={dashboard()}>Back to dashboard</Link>
-                        </Button>
+                        <>
+                            <WalkthroughButton onClick={walkthrough.start} />
+                            <Button asChild variant="ghost" size="sm">
+                                <Link href={dashboard()}>
+                                    Back to dashboard
+                                </Link>
+                            </Button>
+                        </>
                     }
                 />
 
@@ -136,7 +147,10 @@ export default function ActivitiesPage({
                         </CardContent>
                     ) : (
                         <>
-                            <CardContent className="overflow-x-auto px-0">
+                            <CardContent
+                                className="overflow-x-auto px-0"
+                                {...walkthroughTarget('activities-table')}
+                            >
                                 <Table>
                                     <TableHeader>
                                         <TableRow>
@@ -204,15 +218,27 @@ export default function ActivitiesPage({
                                 </Table>
                             </CardContent>
 
-                            <ActivityPagination
-                                {...pagination}
-                                onPageChange={goToPage}
-                                onRowsPerPageChange={changeRowsPerPage}
-                            />
+                            <div
+                                {...walkthroughTarget('activities-pagination')}
+                            >
+                                <ActivityPagination
+                                    {...pagination}
+                                    onPageChange={goToPage}
+                                    onRowsPerPageChange={changeRowsPerPage}
+                                />
+                            </div>
                         </>
                     )}
                 </Card>
             </div>
+
+            {walkthrough.isOpen && (
+                <Walkthrough
+                    steps={walkthroughs.activities}
+                    isSample={walkthrough.isSample}
+                    onFinish={walkthrough.finish}
+                />
+            )}
         </>
     );
 }

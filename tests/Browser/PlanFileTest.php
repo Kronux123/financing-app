@@ -9,7 +9,7 @@ use App\Models\User;
  * tests/Feature/BudgetPlanFileTest.php.
  */
 beforeEach(function () {
-    $this->user = User::factory()->create();
+    $this->user = User::factory()->walkthroughsSeen()->create();
 
     $this->actingAs($this->user);
 });

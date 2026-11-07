@@ -17,8 +17,10 @@ export default function Register({ passwordRules }: Props) {
     return (
         <>
             <Head title="Register" />
+            {/* Replaces this page in the history, as signing in does. */}
             <Form
                 {...store.form()}
+                options={{ replace: true }}
                 resetOnSuccess={['password', 'password_confirmation']}
                 disableWhileProcessing
                 className="flex flex-col gap-6"

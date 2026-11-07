@@ -4,6 +4,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 
 | Applies to | Rule file |
 | --- | --- |
+| resources/js/pages/auth/** | .ai/rules/auth.md |
 | tests/Browser/** | .ai/rules/browser.md |
 | resources/js/pages/activities/**, resources/js/lib/activities.ts, app/Http/Controllers/ActivityController.php | .ai/rules/controllers.md |
 | app/Http/Controllers/MonthExportController.php, app/Actions/Payouts/MonthBreakdown.php, app/Actions/Payouts/BreakdownSheet.php, app/Http/Resources/MonthBreakdownResource.php, resources/views/exports/** | .ai/rules/exports.md |
@@ -15,5 +16,5 @@ Before planning or editing, find the row whose globs match the file's path and r
 | resources/js/pages/welcome.tsx | .ai/rules/pages.md |
 | resources/js/pages/payouts/** | .ai/rules/payouts.md |
 | app/Http/Resources/** | .ai/rules/resources.md |
-| app/Actions/Payouts/**, resources/js/lib/savings.ts, resources/js/pages/months/** | .ai/rules/savings.md |
+| app/Actions/Payouts/**, resources/js/lib/savings.ts, resources/js/pages/months/**, resources/js/lib/walkthroughs.ts, resources/js/lib/sample-account.ts | .ai/rules/savings.md |
 | database/seeders/** | .ai/rules/seeders.md |

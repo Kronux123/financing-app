@@ -3,6 +3,7 @@ import { X } from 'lucide-react';
 import { useState } from 'react';
 import { PixelArt } from '@/components/pixel-art';
 import { Button } from '@/components/ui/button';
+import { walkthroughTarget } from '@/lib/walkthroughs';
 import { index as payoutsRoute } from '@/routes/payouts';
 
 /**
@@ -52,6 +53,7 @@ export function PendingPaydaysBanner() {
         <section
             aria-label="Paydays awaiting review"
             data-test="pending-paydays-banner"
+            {...walkthroughTarget('pending-paydays')}
             className="flex flex-col gap-4 rounded-xl border border-jade/30 bg-jade/10 p-4 sm:flex-row sm:items-center"
         >
             <PixelArt sprite="moneybag" size={48} className="shrink-0" />

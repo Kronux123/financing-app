@@ -11,7 +11,9 @@ import {
 } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { Walkthrough, WalkthroughButton } from '@/components/walkthrough';
 import { useStoredBudgetPlan } from '@/hooks/use-budget-plan';
+import { useWalkthrough } from '@/hooks/use-walkthrough';
 import type { BudgetPlan, DebtProgress } from '@/lib/budget';
 import {
     debtHistoryFor,
@@ -21,6 +23,7 @@ import {
     totalOwed,
 } from '@/lib/budget';
 import { formatPeso } from '@/lib/currency';
+import { walkthroughs, walkthroughTarget } from '@/lib/walkthroughs';
 import { dashboard } from '@/routes';
 import { index as debtRoute } from '@/routes/debt';
 import { edit as financeRoute } from '@/routes/finance';
@@ -103,6 +106,7 @@ const emptyPlan = (plan: BudgetPlan | null): boolean => {
 };
 
 export default function Debt() {
+    const walkthrough = useWalkthrough('debt');
     const plan = useStoredBudgetPlan();
     const [order, setOrder] = useState<Order>('plan');
 
@@ -139,14 +143,21 @@ export default function Debt() {
                         </div>
                     </div>
 
-                    <Button variant="secondary" size="sm" asChild>
-                        <Link href={financeRoute()} data-test="edit-on-plan">
-                            Edit on the plan
-                        </Link>
-                    </Button>
+                    <div className="flex flex-wrap items-center gap-2">
+                        <WalkthroughButton onClick={walkthrough.start} />
+                        <Button variant="secondary" size="sm" asChild>
+                            <Link
+                                href={financeRoute()}
+                                data-test="edit-on-plan"
+                                {...walkthroughTarget('edit-on-plan')}
+                            >
+                                Edit on the plan
+                            </Link>
+                        </Button>
+                    </div>
                 </header>
 
-                <Card>
+                <Card {...walkthroughTarget('debt-total')}>
                     <CardContent className="p-6">
                         <p className="text-sm text-muted-foreground">
                             Total owed
@@ -166,7 +177,7 @@ export default function Debt() {
                     </CardContent>
                 </Card>
 
-                <Card>
+                <Card {...walkthroughTarget('debt-list')}>
                     <CardHeader>
                         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                             <div>
@@ -181,7 +192,10 @@ export default function Debt() {
                             </div>
 
                             {progress.length > 1 && (
-                                <div className="grid shrink-0 gap-1.5">
+                                <div
+                                    className="grid shrink-0 gap-1.5"
+                                    {...walkthroughTarget('debt-order')}
+                                >
                                     <Label
                                         htmlFor="debt-order"
                                         className="text-sm font-medium text-muted-foreground"
@@ -305,6 +319,14 @@ export default function Debt() {
                     <Link href={dashboard()}>Back to dashboard</Link>
                 </Button>
             </div>
+
+            {walkthrough.isOpen && (
+                <Walkthrough
+                    steps={walkthroughs.debt}
+                    isSample={walkthrough.isSample}
+                    onFinish={walkthrough.finish}
+                />
+            )}
         </>
     );
 }

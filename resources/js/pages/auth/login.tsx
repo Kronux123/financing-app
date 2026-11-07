@@ -24,8 +24,14 @@ export default function Login({ status, canResetPassword }: Props) {
 
             <PasskeyVerify />
 
+            {/*
+             * Signing in takes the login page's place in the history, so back
+             * from the dashboard never lands on a login form for an account
+             * that is already signed in. See lib/session-history.ts.
+             */}
             <Form
                 {...store.form()}
+                options={{ replace: true }}
                 resetOnSuccess={['password']}
                 className="flex flex-col gap-6"
             >

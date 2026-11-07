@@ -15,6 +15,8 @@ declare module '@inertiajs/core' {
             sidebarOpen: boolean;
             /** Paydays waiting to be reviewed — see HandleInertiaRequests. */
             pendingPaydays: number;
+            /** Pages whose walkthrough is finished or skipped — see HandleInertiaRequests. */
+            seenWalkthroughs: string[];
             [key: string]: unknown;
         };
     }

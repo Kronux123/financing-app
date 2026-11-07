@@ -71,4 +71,12 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
     {
         return $this->hasMany(Payout::class)->orderByDesc('paid_on');
     }
+
+    /**
+     * @return HasMany<WalkthroughProgress, $this>
+     */
+    public function walkthroughProgress(): HasMany
+    {
+        return $this->hasMany(WalkthroughProgress::class);
+    }
 }

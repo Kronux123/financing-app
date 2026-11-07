@@ -2,6 +2,11 @@ import { router, usePage } from '@inertiajs/react';
 import { useMemo, useState } from 'react';
 import type { BudgetPlan } from '@/lib/budget';
 import { createPlan, isRemainderItem, withSweptRemainders } from '@/lib/budget';
+import { sampleAccount } from '@/lib/sample-account';
+import {
+    isSamplePreviewActive,
+    useIsSamplePreview,
+} from '@/lib/sample-preview';
 import { update as updatePlan } from '@/routes/finance';
 
 /**
@@ -16,7 +21,8 @@ import { update as updatePlan } from '@/routes/finance';
  * because the draft below watches its identity to notice a fresh plan.
  */
 export function useStoredBudgetPlan(): BudgetPlan | null {
-    const stored = usePage<{ plan: BudgetPlan | null }>().props.plan;
+    const ownPlan = usePage<{ plan: BudgetPlan | null }>().props.plan;
+    const stored = useIsSamplePreview() ? sampleAccount().plan : ownPlan;
 
     return useMemo(
         () => (stored === null ? null : withSweptRemainders(stored)),
@@ -29,6 +35,10 @@ export const saveBudgetPlan = (
     plan: BudgetPlan,
     onSuccess?: () => void,
 ): void => {
+    if (isSamplePreviewActive()) {
+        return;
+    }
+
     router.put(updatePlan().url, serialise(plan), {
         preserveScroll: true,
         onSuccess,

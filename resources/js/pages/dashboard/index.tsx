@@ -17,8 +17,10 @@ import { PageHeader } from '@/components/page-header';
 import { PixelArt } from '@/components/pixel-art';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Walkthrough, WalkthroughButton } from '@/components/walkthrough';
 import { useStoredBudgetPlan } from '@/hooks/use-budget-plan';
 import { useSavingsHistory } from '@/hooks/use-savings';
+import { useWalkthrough } from '@/hooks/use-walkthrough';
 import type { Activity as ActivityRow } from '@/lib/activities';
 import { formatActivityDate } from '@/lib/activities';
 import type { BudgetPlan, FreeingUp } from '@/lib/budget';
@@ -35,8 +37,10 @@ import {
     totalSaved as planTotalSaved,
 } from '@/lib/budget';
 import { formatPeso, formatSigned } from '@/lib/currency';
+import { sampleAccount } from '@/lib/sample-account';
 import { lastMonths, monthShortLabel } from '@/lib/savings';
 import { cn } from '@/lib/utils';
+import { walkthroughs, walkthroughTarget } from '@/lib/walkthroughs';
 import { dashboard } from '@/routes';
 import dashboardRoutes from '@/routes/dashboard';
 import { edit as financeRoute } from '@/routes/finance';
@@ -44,6 +48,9 @@ import { index as payoutsRoute } from '@/routes/payouts';
 
 /** How far ahead the cashflow tile looks for payables that finish. */
 const cashflowWindowMonths = 12;
+
+/** Matches DashboardController::RECENT_ACTIVITY_ROWS, for the sample account. */
+const recentActivityRows = 5;
 
 /** How much history the chart shows. Enough to read a trend, few enough to fit. */
 const chartMonths = 6;
@@ -189,7 +196,7 @@ const fundNote = ({ target, gap, monthsToFill }: FundFigures): string => {
         : `${formatPeso(gap)} to go · nothing going to savings yet.`;
 };
 
-function OverviewHeader() {
+function OverviewHeader({ onStartTour }: { onStartTour: () => void }) {
     return (
         <PageHeader
             art="wallet"
@@ -198,18 +205,23 @@ function OverviewHeader() {
                 month: 'long',
                 year: 'numeric',
             })}
+            actions={<WalkthroughButton onClick={onStartTour} />}
         />
     );
 }
 
 export default function Dashboard({
-    recentActivity,
+    recentActivity: ownRecentActivity,
 }: {
     /** The newest rows of the activity log, newest first. */
     recentActivity: ActivityRow[];
 }) {
+    const walkthrough = useWalkthrough('dashboard');
     const plan = useStoredBudgetPlan();
     const history = useSavingsHistory();
+    const recentActivity = walkthrough.isSample
+        ? sampleAccount().activities.slice(0, recentActivityRows)
+        : ownRecentActivity;
 
     if (plan === null || !isPlanPopulated(plan)) {
         return (
@@ -217,7 +229,7 @@ export default function Dashboard({
                 <Head title="Dashboard" />
 
                 <div className="flex w-full flex-col gap-6 p-4 md:p-6">
-                    <OverviewHeader />
+                    <OverviewHeader onStartTour={walkthrough.start} />
                     <DashboardOnboarding />
                 </div>
             </>
@@ -256,11 +268,11 @@ export default function Dashboard({
             <Head title="Dashboard" />
 
             <div className="flex w-full flex-col gap-6 p-4 md:p-6">
-                <OverviewHeader />
+                <OverviewHeader onStartTour={walkthrough.start} />
 
                 <PendingPaydaysBanner />
 
-                <Card className="py-0">
+                <Card className="py-0" {...walkthroughTarget('pay-flow')}>
                     <CardContent className="p-6 md:p-8">
                         <PayFlow
                             month={today.toLocaleDateString('en-US', {
@@ -275,7 +287,10 @@ export default function Dashboard({
                 </Card>
 
                 <div className="grid gap-6 lg:grid-cols-3">
-                    <Card className="gap-4">
+                    <Card
+                        className="gap-4"
+                        {...walkthroughTarget('total-saved')}
+                    >
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
                                 <PiggyBank
@@ -320,7 +335,10 @@ export default function Dashboard({
                         </CardContent>
                     </Card>
 
-                    <Card className="gap-4">
+                    <Card
+                        className="gap-4"
+                        {...walkthroughTarget('emergency-fund')}
+                    >
                         <CardHeader className="flex flex-row items-center justify-between gap-4">
                             <CardTitle className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
                                 <ShieldCheck aria-hidden className="size-4" />
@@ -369,7 +387,10 @@ export default function Dashboard({
                      * What you owe, and what it frees up as it ends — the same
                      * payables seen from both directions, so they share a card.
                      */}
-                    <Card className="gap-4">
+                    <Card
+                        className="gap-4"
+                        {...walkthroughTarget('outstanding-debt')}
+                    >
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
                                 <Landmark aria-hidden className="size-4" />
@@ -425,7 +446,7 @@ export default function Dashboard({
                  * fill whatever height that leaves — no ragged bottom edge.
                  */}
                 <div className="grid gap-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
-                    <Card>
+                    <Card {...walkthroughTarget('monthly-savings')}>
                         <CardHeader className="flex flex-row items-center justify-between gap-4">
                             <CardTitle className="flex items-center gap-2 text-base">
                                 <PixelArt sprite="chart" size={24} />
@@ -461,7 +482,7 @@ export default function Dashboard({
                         </CardContent>
                     </Card>
 
-                    <Card>
+                    <Card {...walkthroughTarget('recent-activity')}>
                         <CardHeader className="flex flex-row items-center justify-between gap-4">
                             <CardTitle className="flex items-center gap-2 text-base">
                                 <PixelArt sprite="receipt" size={24} />
@@ -547,6 +568,14 @@ export default function Dashboard({
                     </Card>
                 </div>
             </div>
+
+            {walkthrough.isOpen && (
+                <Walkthrough
+                    steps={walkthroughs.dashboard}
+                    isSample={walkthrough.isSample}
+                    onFinish={walkthrough.finish}
+                />
+            )}
         </>
     );
 }
